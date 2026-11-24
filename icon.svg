@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Crypt of Shadows Paladin Crest">
+  <defs>
+    <radialGradient id="bgGlow" cx="50%" cy="46%" r="54%">
+      <stop offset="0%" stop-color="#1b2232"/>
+      <stop offset="65%" stop-color="#0d1018"/>
+      <stop offset="100%" stop-color="#05060a"/>
+    </radialGradient>
+    <linearGradient id="ironRim" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#64748b"/>
+      <stop offset="45%" stop-color="#2a3140"/>
+      <stop offset="100%" stop-color="#0f131c"/>
+    </linearGradient>
+    <linearGradient id="goldTrim" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#facc15"/>
+      <stop offset="50%" stop-color="#b78628"/>
+      <stop offset="100%" stop-color="#6b4b12"/>
+    </linearGradient>
+    <radialGradient id="crimsonGem" cx="42%" cy="36%" r="58%">
+      <stop offset="0%" stop-color="#fca5a5"/>
+      <stop offset="35%" stop-color="#dc2626"/>
+      <stop offset="100%" stop-color="#450a0a"/>
+    </radialGradient>
+    <linearGradient id="bladeSteel" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="50%" stop-color="#94a3b8"/>
+      <stop offset="100%" stop-color="#475569"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="96" fill="url(#bgGlow)"/>
+
+  <!-- Subtle arcane rune ring -->
+  <circle cx="256" cy="256" r="208" fill="none" stroke="#9a7b46" stroke-opacity="0.22" stroke-width="3" stroke-dasharray="10 14"/>
+
+  <!-- Hammered iron octagonal gothic shield -->
+  <polygon points="256,46 408,108 426,274 352,404 256,466 160,404 86,274 104,108" fill="#0d111a" stroke="url(#ironRim)" stroke-width="18" stroke-linejoin="round"/>
+  <polygon points="256,66 390,121 406,270 338,388 256,444 174,388 106,270 122,121" fill="none" stroke="url(#goldTrim)" stroke-width="4" stroke-linejoin="round"/>
+
+  <!-- Crossed gothic broadswords behind crest -->
+  <g transform="translate(256 256)">
+    <g transform="rotate(-38)">
+      <polygon points="0,-168 11,-134 9,68 -9,68 -11,-134" fill="url(#bladeSteel)"/>
+      <rect x="-34" y="64" width="68" height="12" rx="4" fill="url(#goldTrim)"/>
+      <rect x="-6" y="76" width="12" height="38" rx="3" fill="#451a03"/>
+      <circle cx="0" cy="120" r="10" fill="url(#goldTrim)"/>
+    </g>
+    <g transform="rotate(38)">
+      <polygon points="0,-168 11,-134 9,68 -9,68 -11,-134" fill="url(#bladeSteel)"/>
+      <rect x="-34" y="64" width="68" height="12" rx="4" fill="url(#goldTrim)"/>
+      <rect x="-6" y="76" width="12" height="38" rx="3" fill="#451a03"/>
+      <circle cx="0" cy="120" r="10" fill="url(#goldTrim)"/>
+    </g>
+  </g>
+
+  <!-- Central Paladin Gothic Cross Filigree -->
+  <path d="M256 106 L278 154 L274 224 L344 220 L386 248 L344 276 L274 272 L278 362 L256 406 L234 362 L238 272 L168 276 L126 248 L168 220 L238 224 L234 154 Z" fill="#131926" stroke="url(#goldTrim)" stroke-width="5" stroke-linejoin="round"/>
+
+  <!-- Crimson Arcane Core Gem -->
+  <polygon points="256,204 294,248 256,292 218,248" fill="url(#crimsonGem)" stroke="#facc15" stroke-width="4"/>
+  <polygon points="256,216 274,244 256,254 238,244" fill="#fecaca" fill-opacity="0.45"/>
+</svg>

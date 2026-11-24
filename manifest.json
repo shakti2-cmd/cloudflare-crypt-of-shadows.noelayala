@@ -1,0 +1,19 @@
+{
+  "name": "Crypt of Shadows — Isometric ARPG",
+  "short_name": "Crypt ARPG",
+  "description": "Mobile-first dark-gothic isometric action RPG prototype with procedural crypts, real-time melee/spell combat, and Diablo-style loot drops.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#07080c",
+  "theme_color": "#07080c",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["games", "action", "rpg"]
+}
