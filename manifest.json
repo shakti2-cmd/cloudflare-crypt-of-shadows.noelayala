@@ -1,7 +1,7 @@
 {
   "name": "Crypt of Shadows — Isometric ARPG",
   "short_name": "Crypt ARPG",
-  "description": "Mobile-first dark-gothic isometric ARPG (v0.3.0) with 5 classes, evolution Pets, multi-biome dungeons, Albion-style bosses, socketed sets, 3-slot saves, and optional 4P WebRTC co-op.",
+  "description": "Mobile-first dark-gothic isometric ARPG (v0.3.1) with 5 classes, evolution Pets, multi-biome dungeons, Albion-style bosses, socketed sets, 3-slot saves, and optional 4P WebRTC co-op.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

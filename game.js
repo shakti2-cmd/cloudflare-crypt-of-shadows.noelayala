@@ -4,7 +4,7 @@
   // =========================================================================
   // CONSTANTS & CONFIG
   // =========================================================================
-  const VERSION = '0.3.0';
+  const VERSION = '0.3.1';
   const SAVE_SLOTS_KEY = 'crypt_arpg_v030_slots';
   const ACCOUNT_KEY = 'crypt_arpg_v030_account';
   const LEGACY_SAVE_KEY_V020 = 'crypt_arpg_v020_save';
@@ -709,6 +709,18 @@
     return c;
   }
 
+  function buildGlowSprite(innerColor, midColor, radius) {
+    const c = makeCanvas(radius * 2, radius * 2);
+    const g = c.getContext('2d');
+    const grad = g.createRadialGradient(radius, radius, 2, radius, radius, radius);
+    grad.addColorStop(0, innerColor);
+    grad.addColorStop(0.5, midColor);
+    grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, radius * 2, radius * 2);
+    return c;
+  }
+
   function tintSprite(srcCanvas, tintRgba) {
     if (!tintRgba) return srcCanvas;
     const c = makeCanvas(srcCanvas.width, srcCanvas.height);
@@ -1116,9 +1128,23 @@
     p.petId = PETS_CONFIG[merged.petId] ? merged.petId : 'hound';
     p.petRanks = Object.assign({ hound: 1, wisp: 1, hatchling: 1 }, merged.petRanks || {});
     p.petXp = merged.petXp || 0;
-    p.equipped = Object.assign(createStarterGear(state.heroClass), merged.equipped || {});
-    p.swapSet = Object.assign({ weapon: null, offhand: null }, merged.swapSet || {});
-    p.bag = Array.isArray(merged.bag) ? merged.bag.slice(0, MAX_BAG_SLOTS) : [];
+    const normItem = (it) => {
+      if (!it || typeof it !== 'object') return null;
+      if (it.kind === 'gem') return it;
+      return Object.assign({ sockets: 0, gems: [], stats: {} }, it, {
+        gems: Array.isArray(it.gems) ? it.gems : [],
+        stats: (it.stats && typeof it.stats === 'object') ? it.stats : {}
+      });
+    };
+    const starter = createStarterGear(state.heroClass);
+    const rawEq = (merged.equipped && typeof merged.equipped === 'object') ? merged.equipped : {};
+    p.equipped = {};
+    for (const sl of SLOTS) {
+      p.equipped[sl] = normItem(rawEq[sl] !== undefined ? rawEq[sl] : starter[sl]);
+    }
+    const rawSwap = (merged.swapSet && typeof merged.swapSet === 'object') ? merged.swapSet : {};
+    p.swapSet = { weapon: normItem(rawSwap.weapon), offhand: normItem(rawSwap.offhand) };
+    p.bag = Array.isArray(merged.bag) ? merged.bag.map(normItem).filter(Boolean).slice(0, MAX_BAG_SLOTS) : [];
     syncPlayerVitalsBounds();
     p.hp = p.maxHp;
     p.mp = p.maxMp;
@@ -2857,8 +2883,10 @@
     dom.joystickZone.addEventListener('pointerup', releaseJoy);
     dom.joystickZone.addEventListener('pointercancel', releaseJoy);
 
-    // Combat buttons
+    // Combat buttons (null-guarded)
+    const on = (el, ev, fn) => { if (el) el.addEventListener(ev, fn); };
     const bindBtn = (el, fn) => {
+      if (!el) return;
       el.addEventListener('pointerdown', (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -2939,38 +2967,47 @@
     });
 
     // Main Menu & Character Creation
-    dom.btnContinueTown.addEventListener('click', () => { sfx.unlock(); enterTown(); });
-    dom.btnOpenCharCreate.addEventListener('click', () => { sfx.unlock(); setScreen('CHAR_CREATE'); });
-    dom.btnOpenCoopMenu.addEventListener('click', () => { sfx.unlock(); openTownNpcDrawer('coop'); });
-    dom.btnOpenSaveTransfer.addEventListener('click', () => {
+    on(dom.btnContinueTown, 'click', () => {
       sfx.unlock();
-      dom.saveCodeInput.value = exportSaveCode();
-      dom.saveTransferDrawer.showModal();
+      if (!state.saveSlots[state.activeSlot]) {
+        const fresh = createFreshHeroSlotData('Aldric', 'paladin', 'hound');
+        state.saveSlots[state.activeSlot] = fresh;
+        applySlotDataToRuntime(fresh);
+        saveHeroProfile();
+      }
+      enterTown();
     });
-    dom.btnCloseSaveTransfer.addEventListener('click', () => dom.saveTransferDrawer.close());
-    dom.btnCopySaveCode.addEventListener('click', () => {
+    on(dom.btnOpenCharCreate, 'click', () => { sfx.unlock(); setScreen('CHAR_CREATE'); });
+    on(dom.btnOpenCoopMenu, 'click', () => { sfx.unlock(); openTownNpcDrawer('coop'); });
+    on(dom.btnOpenSaveTransfer, 'click', () => {
+      sfx.unlock();
+      if (dom.saveCodeInput) dom.saveCodeInput.value = exportSaveCode();
+      dom.saveTransferDrawer?.showModal();
+    });
+    on(dom.btnCloseSaveTransfer, 'click', () => dom.saveTransferDrawer?.close());
+    on(dom.btnCopySaveCode, 'click', () => {
       const code = exportSaveCode();
-      dom.saveCodeInput.value = code;
+      if (dom.saveCodeInput) dom.saveCodeInput.value = code;
       navigator.clipboard?.writeText(code).catch(() => {});
       showToast('Save Code Copied!');
     });
-    dom.btnImportSaveCode.addEventListener('click', () => {
-      if (importSaveCode(dom.saveCodeInput.value)) {
-        dom.saveTransferDrawer.close();
+    on(dom.btnImportSaveCode, 'click', () => {
+      if (importSaveCode(dom.saveCodeInput?.value)) {
+        dom.saveTransferDrawer?.close();
         showToast('Save Imported!');
       } else {
         showToast('Invalid Save Code!');
       }
     });
 
-    dom.btnCharCreateBack.addEventListener('click', () => setScreen('MAIN_MENU'));
-    dom.btnRandomName.addEventListener('click', () => {
+    on(dom.btnCharCreateBack, 'click', () => setScreen('MAIN_MENU'));
+    on(dom.btnRandomName, 'click', () => {
       sfx.unlock();
-      dom.heroNameInput.value = GOTHIC_NAMES[Math.floor(Math.random() * GOTHIC_NAMES.length)];
+      if (dom.heroNameInput) dom.heroNameInput.value = GOTHIC_NAMES[Math.floor(Math.random() * GOTHIC_NAMES.length)];
     });
-    dom.btnForgeHero.addEventListener('click', () => {
+    on(dom.btnForgeHero, 'click', () => {
       sfx.unlock();
-      createNewHero(dom.heroNameInput.value, state.selectedCreateClass, state.selectedCreatePet);
+      createNewHero(dom.heroNameInput?.value, state.selectedCreateClass, state.selectedCreatePet);
     });
 
     const toggleMuteAll = () => {
@@ -2979,52 +3016,52 @@
       savePrefs();
       syncAudioToggleLabels();
     };
-    dom.btnAudioToggle.addEventListener('click', toggleMuteAll);
-    dom.btnHudAudio.addEventListener('click', toggleMuteAll);
-    dom.btnManualSave.addEventListener('click', () => { sfx.unlock(); saveHeroProfile(true); });
+    on(dom.btnAudioToggle, 'click', toggleMuteAll);
+    on(dom.btnHudAudio, 'click', toggleMuteAll);
+    on(dom.btnManualSave, 'click', () => { sfx.unlock(); saveHeroProfile(true); });
 
     // Town Quick Dock & NPC Drawer
-    dom.btnTownForge.addEventListener('click', () => { sfx.unlock(); openTownNpcDrawer('blacksmith'); });
-    dom.btnTownStash.addEventListener('click', () => { sfx.unlock(); openTownNpcDrawer('stash'); });
-    dom.btnTownApothecary.addEventListener('click', () => { sfx.unlock(); openTownNpcDrawer('apothecary'); });
-    dom.btnTownBounties.addEventListener('click', () => { sfx.unlock(); openTownNpcDrawer('bounties'); });
-    dom.btnTownPets.addEventListener('click', () => { sfx.unlock(); openTownNpcDrawer('pets'); });
-    dom.btnTownCodex.addEventListener('click', () => { sfx.unlock(); openTownNpcDrawer('codex'); });
-    dom.btnTownWardrobe.addEventListener('click', () => { sfx.unlock(); openTownNpcDrawer('wardrobe'); });
-    dom.btnTownCoop.addEventListener('click', () => { sfx.unlock(); openTownNpcDrawer('coop'); });
-    dom.btnTownWaypoint.addEventListener('click', () => { sfx.unlock(); openTownNpcDrawer('waypoint'); });
-    dom.btnTownMenu.addEventListener('click', () => { saveHeroProfile(); setScreen('MAIN_MENU'); });
-    dom.btnCloseTownNpc.addEventListener('click', () => dom.townNpcDrawer.close());
-    dom.townNpcDrawer.addEventListener('click', (e) => {
+    on(dom.btnTownForge, 'click', () => { sfx.unlock(); openTownNpcDrawer('blacksmith'); });
+    on(dom.btnTownStash, 'click', () => { sfx.unlock(); openTownNpcDrawer('stash'); });
+    on(dom.btnTownApothecary, 'click', () => { sfx.unlock(); openTownNpcDrawer('apothecary'); });
+    on(dom.btnTownBounties, 'click', () => { sfx.unlock(); openTownNpcDrawer('bounties'); });
+    on(dom.btnTownPets, 'click', () => { sfx.unlock(); openTownNpcDrawer('pets'); });
+    on(dom.btnTownCodex, 'click', () => { sfx.unlock(); openTownNpcDrawer('codex'); });
+    on(dom.btnTownWardrobe, 'click', () => { sfx.unlock(); openTownNpcDrawer('wardrobe'); });
+    on(dom.btnTownCoop, 'click', () => { sfx.unlock(); openTownNpcDrawer('coop'); });
+    on(dom.btnTownWaypoint, 'click', () => { sfx.unlock(); openTownNpcDrawer('waypoint'); });
+    on(dom.btnTownMenu, 'click', () => { saveHeroProfile(); setScreen('MAIN_MENU'); });
+    on(dom.btnCloseTownNpc, 'click', () => dom.townNpcDrawer?.close());
+    on(dom.townNpcDrawer, 'click', (e) => {
       if (e.target === dom.townNpcDrawer) dom.townNpcDrawer.close();
     });
 
     // Inventory Tabs & Sort Bag
-    dom.btnInventory.addEventListener('click', () => { sfx.unlock(); toggleInventory(); });
-    dom.btnCloseInventory.addEventListener('click', () => toggleInventory(false));
-    dom.inventoryDrawer.addEventListener('click', (e) => {
+    on(dom.btnInventory, 'click', () => { sfx.unlock(); toggleInventory(); });
+    on(dom.btnCloseInventory, 'click', () => toggleInventory(false));
+    on(dom.inventoryDrawer, 'click', (e) => {
       if (e.target === dom.inventoryDrawer) toggleInventory(false);
     });
-    dom.invTabGear.addEventListener('click', () => { state.invTab = 'gear'; renderInventoryUI(); });
-    dom.invTabSkills.addEventListener('click', () => { state.invTab = 'skills'; renderInventoryUI(); });
-    dom.invTabMastery.addEventListener('click', () => { state.invTab = 'mastery'; renderInventoryUI(); });
-    dom.btnSortBag.addEventListener('click', () => {
+    on(dom.invTabGear, 'click', () => { state.invTab = 'gear'; renderInventoryUI(); });
+    on(dom.invTabSkills, 'click', () => { state.invTab = 'skills'; renderInventoryUI(); });
+    on(dom.invTabMastery, 'click', () => { state.invTab = 'mastery'; renderInventoryUI(); });
+    on(dom.btnSortBag, 'click', () => {
       state.player.bag.sort((a, b) => ((RARITY[b.rarity]?.rank || 0) - (RARITY[a.rarity]?.rank || 0)) || String(a.slot).localeCompare(String(b.slot)));
       sfx.loot();
       renderInventoryUI();
     });
 
-    dom.btnTownPortal.addEventListener('click', () => { sfx.unlock(); sfx.portal(); enterTown(); });
-    dom.btnLootFilter.addEventListener('click', () => {
+    on(dom.btnTownPortal, 'click', () => { sfx.unlock(); sfx.portal(); enterTown(); });
+    on(dom.btnLootFilter, 'click', () => {
       sfx.unlock();
       const idx = LOOT_FILTER_MODES.indexOf(state.lootFilter);
       state.lootFilter = LOOT_FILTER_MODES[(idx + 1) % LOOT_FILTER_MODES.length];
-      dom.lootFilterLabel.textContent = LOOT_FILTER_LABELS[state.lootFilter];
+      if (dom.lootFilterLabel) dom.lootFilterLabel.textContent = LOOT_FILTER_LABELS[state.lootFilter];
       savePrefs();
       showToast(`Filter: ${LOOT_FILTER_LABELS[state.lootFilter]}`);
     });
 
-    dom.btnNewFloor.addEventListener('click', () => {
+    on(dom.btnNewFloor, 'click', () => {
       sfx.unlock();
       if (state.mode === 'TOWN') { openTownNpcDrawer('waypoint'); return; }
       const nextFloor = state.stairs.unlocked ? state.floor + 1 : state.floor;
@@ -3032,8 +3069,8 @@
       enterDungeonFloor(nextSeed, nextFloor);
     });
 
-    dom.btnRespawn.addEventListener('click', () => { sfx.unlock(); respawnAtWaypoint(false); });
-    dom.btnRespawnNew.addEventListener('click', () => { sfx.unlock(); respawnAtWaypoint(true); });
+    on(dom.btnRespawn, 'click', () => { sfx.unlock(); respawnAtWaypoint(false); });
+    on(dom.btnRespawnNew, 'click', () => { sfx.unlock(); respawnAtWaypoint(true); });
   }
 
   function updateJoystickFromPointer(px, py) {

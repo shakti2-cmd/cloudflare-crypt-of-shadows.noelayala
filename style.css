@@ -59,6 +59,14 @@ html, body {
 
 .hidden {
   display: none !important;
+  pointer-events: none !important;
+}
+
+#inventoryDrawer:not([open]),
+#townNpcDrawer:not([open]),
+#saveTransferDrawer:not([open]) {
+  display: none;
+  pointer-events: none;
 }
 
 /* ---------- HUD CLUSTERS ---------- */
@@ -1043,6 +1051,7 @@ html, body {
   position: fixed;
   inset: 0;
   z-index: 40;
+  pointer-events: auto;
   background: radial-gradient(circle at 50% 25%, #1c1218 0%, #07080c 68%);
   display: flex;
   align-items: center;
