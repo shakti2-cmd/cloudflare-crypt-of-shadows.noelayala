@@ -4,18 +4,21 @@
   // =========================================================================
   // CONSTANTS & CONFIG
   // =========================================================================
-  const VERSION = '0.2.0';
-  const SAVE_KEY = 'crypt_arpg_v020_save';
-  const LEGACY_SAVE_KEY = 'crypt_arpg_v010_save';
-  const STASH_KEY = 'crypt_arpg_stash_v020';
+  const VERSION = '0.3.0';
+  const SAVE_SLOTS_KEY = 'crypt_arpg_v030_slots';
+  const ACCOUNT_KEY = 'crypt_arpg_v030_account';
+  const LEGACY_SAVE_KEY_V020 = 'crypt_arpg_v020_save';
+  const LEGACY_SAVE_KEY_V010 = 'crypt_arpg_v010_save';
+  const LEGACY_STASH_KEY = 'crypt_arpg_stash_v020';
   const PREFS_KEY = 'crypt_arpg_prefs_v020';
-  const MAP_W = 42;
-  const MAP_H = 42;
+  let MAP_W = 44;
+  let MAP_H = 44;
   const TILE_W = 64;
   const TILE_H = 32;
   const WALL_H = 52;
-  const MAX_BAG_SLOTS = 20;
-  const MAX_STASH_SLOTS = 24;
+  const MAX_BAG_SLOTS = 24;
+  const MAX_STASH_SLOTS = 30;
+  const MAX_SAVE_SLOTS = 3;
 
   const TILE = {
     VOID: 0,
@@ -26,85 +29,232 @@
   };
 
   const RARITY = {
-    common:    { label: 'Common',    color: '#cbd5e1', beam: 'rgba(203, 213, 225, 0.25)', bg: 'rgba(15, 23, 42, 0.88)' },
-    magic:     { label: 'Magic',     color: '#60a5fa', beam: 'rgba(96, 165, 250, 0.52)',  bg: 'rgba(15, 28, 56, 0.90)' },
-    rare:      { label: 'Rare',      color: '#facc15', beam: 'rgba(250, 204, 21, 0.62)',  bg: 'rgba(42, 30, 8, 0.92)' },
-    legendary: { label: 'Legendary', color: '#fb923c', beam: 'rgba(251, 146, 60, 0.78)',  bg: 'rgba(54, 21, 8, 0.94)' }
+    common:    { label: 'Common',    color: '#cbd5e1', beam: 'rgba(203, 213, 225, 0.25)', bg: 'rgba(15, 23, 42, 0.88)', rank: 1 },
+    magic:     { label: 'Magic',     color: '#60a5fa', beam: 'rgba(96, 165, 250, 0.52)',  bg: 'rgba(15, 28, 56, 0.90)', rank: 2 },
+    rare:      { label: 'Rare',      color: '#facc15', beam: 'rgba(250, 204, 21, 0.62)',  bg: 'rgba(42, 30, 8, 0.92)',  rank: 3 },
+    set:       { label: 'Set',       color: '#10b981', beam: 'rgba(16, 185, 129, 0.72)',  bg: 'rgba(6, 48, 36, 0.94)',  rank: 4 },
+    legendary: { label: 'Legendary', color: '#fb923c', beam: 'rgba(251, 146, 60, 0.78)',  bg: 'rgba(54, 21, 8, 0.94)',  rank: 5 }
   };
 
-  const SLOTS = ['weapon', 'helm', 'armor', 'ring'];
-  const SLOT_LABELS = { weapon: 'Weapon', helm: 'Helm', armor: 'Armor', ring: 'Ring' };
+  const SLOTS = ['weapon', 'offhand', 'helm', 'armor', 'boots', 'ring', 'amulet'];
+  const SLOT_LABELS = {
+    weapon: 'Weapon', offhand: 'Off-Hand', helm: 'Helm',
+    armor: 'Armor', boots: 'Boots', ring: 'Ring', amulet: 'Amulet'
+  };
   const LOOT_FILTER_MODES = ['all', 'magic', 'rare'];
   const LOOT_FILTER_LABELS = { all: 'Loot: All', magic: 'Loot: Magic+', rare: 'Loot: Rare+' };
+
+  const MAP_SIZES = {
+    compact:   { id: 'compact',   label: 'Compact',   dim: 34, rooms: [6, 7] },
+    standard:  { id: 'standard',  label: 'Standard',  dim: 44, rooms: [8, 10] },
+    labyrinth: { id: 'labyrinth', label: 'Labyrinth', dim: 56, rooms: [11, 14] }
+  };
+
+  const BIOMES = {
+    crypt:   { id: 'crypt',   name: 'Sunken Stone Crypt',   floorTint: null,                     wallTint: null,                     fog: '#07080c' },
+    cinder:  { id: 'cinder',  name: 'Molten Cinder Cavern', floorTint: 'rgba(234, 88, 12, 0.22)', wallTint: 'rgba(154, 52, 18, 0.28)', fog: '#120705' },
+    ossuary: { id: 'ossuary', name: 'Frozen Ossuary',       floorTint: 'rgba(56, 189, 248, 0.20)', wallTint: 'rgba(14, 116, 144, 0.25)',fog: '#050c14' },
+    blight:  { id: 'blight',  name: 'Overgrown Blight Ruin',floorTint: 'rgba(34, 197, 94, 0.18)',  wallTint: 'rgba(21, 128, 61, 0.24)', fog: '#051008' }
+  };
+
+  const WEAPON_TYPES = {
+    greatsword:  { id: 'greatsword',  label: 'Greatsword',  skillName: 'Whirlwind Slam', mana: 16, cd: 4.5, stagger: 22 },
+    warhammer:   { id: 'warhammer',   label: 'Warhammer',   skillName: 'Ground Shatter', mana: 18, cd: 5.5, stagger: 38 },
+    longbow:     { id: 'longbow',     label: 'Longbow',     skillName: 'Multishot Fan',  mana: 14, cd: 3.5, stagger: 12 },
+    crossbow:    { id: 'crossbow',    label: 'Crossbow',    skillName: 'Explosive Bolt', mana: 18, cd: 4.2, stagger: 24 },
+    necro_staff: { id: 'necro_staff', label: 'Necro Staff', skillName: 'Bone Prison',    mana: 20, cd: 6.0, stagger: 26 },
+    arcane_tome: { id: 'arcane_tome', label: 'Arcane Tome', skillName: 'Phase Blink',    mana: 14, cd: 4.0, stagger: 10 }
+  };
+
+  const GEM_DEFS = {
+    ruby:     { id: 'ruby',     name: 'Ruby',     color: '#ef4444', stat: 'atk',  val: 8,  desc: '+8 ATK' },
+    sapphire: { id: 'sapphire', name: 'Sapphire', color: '#3b82f6', stat: 'mp',   val: 20, desc: '+20 Max MP' },
+    topaz:    { id: 'topaz',    name: 'Topaz',    color: '#eab308', stat: 'crit', val: 3,  desc: '+3% Crit' },
+    skull:    { id: 'skull',    name: 'Skull',    color: '#a855f7', stat: 'loh',  val: 5,  desc: '+5 Life on Hit' }
+  };
+
+  const SET_DEFS = {
+    cryptguard: {
+      id: 'cryptguard',
+      name: 'Cryptguard Bulwark',
+      twoPc: '+15% Armor & +45 Max HP',
+      fourPc: '+20% Attack & +10% Crit',
+      bonus2: { armPct: 0.15, hp: 45 },
+      bonus4: { atkPct: 0.2, crit: 10 }
+    },
+    nightstalker: {
+      id: 'nightstalker',
+      name: 'Nightstalker Shroud',
+      twoPc: '+12% Move Speed & +6% Crit',
+      fourPc: '+28% Crit Dmg & +15% Attack',
+      bonus2: { speedPct: 0.12, crit: 6 },
+      bonus4: { critDmg: 0.28, atkPct: 0.15 }
+    },
+    soulbinder: {
+      id: 'soulbinder',
+      name: 'Soulbinder Regalia',
+      twoPc: '+30 Max MP & +15% Spell/Minion',
+      fourPc: '+25% Minion/Spell Power & +6 LOH',
+      bonus2: { mp: 30, minionPct: 0.15 },
+      bonus4: { minionPct: 0.25, atkPct: 0.15, loh: 6 }
+    }
+  };
+
+  const PETS_CONFIG = {
+    hound: {
+      id: 'hound',
+      name: 'Shadow Hound',
+      skillName: 'Rending Bite',
+      passiveDesc: '+10% Move Speed',
+      color: '#f43f5e',
+      cd: 4.5,
+      passive: { speedPct: 0.1 }
+    },
+    wisp: {
+      id: 'wisp',
+      name: 'Ember Wisp',
+      skillName: 'Fire Spit',
+      passiveDesc: '+15% Gold Find',
+      color: '#f97316',
+      cd: 3.5,
+      passive: { goldPct: 0.15 }
+    },
+    hatchling: {
+      id: 'hatchling',
+      name: 'Stone Hatchling',
+      skillName: 'Taunt Pulse',
+      passiveDesc: '+15% Defense',
+      color: '#94a3b8',
+      cd: 6.0,
+      passive: { armPct: 0.15 }
+    }
+  };
+
+  const MASTERY_NODES = [
+    { id: 'off_1', branch: 'Offense',  name: 'Brutal Strikes', desc: '+10% Attack',         req: null,    bonus: { atkPct: 0.1 } },
+    { id: 'off_2', branch: 'Offense',  name: 'Lethal Precision',desc: '+6% Crit Chance',   req: 'off_1', bonus: { crit: 6 } },
+    { id: 'off_3', branch: 'Offense',  name: 'Executioner',    desc: '+25% Crit Damage',   req: 'off_2', bonus: { critDmg: 0.25 } },
+    { id: 'off_4', branch: 'Offense',  name: 'Awakened Fury',  desc: '+25% Ult Charge Rate',req: 'off_3', bonus: { ultRate: 0.25 } },
+    { id: 'def_1', branch: 'Defense',  name: 'Iron Skin',      desc: '+15% Armor',         req: null,    bonus: { armPct: 0.15 } },
+    { id: 'def_2', branch: 'Defense',  name: 'Vitality Surge', desc: '+60 Max HP',         req: 'def_1', bonus: { hp: 60 } },
+    { id: 'def_3', branch: 'Defense',  name: 'Vampiric Leech', desc: '+5 Life on Hit',     req: 'def_2', bonus: { loh: 5 } },
+    { id: 'def_4', branch: 'Defense',  name: 'Bulwark',        desc: '-12% Damage Taken',  req: 'def_3', bonus: { dr: 0.12 } },
+    { id: 'sum_1', branch: 'Utility',  name: 'Commander',      desc: '+20% Minion/Pet Dmg',req: null,    bonus: { minionPct: 0.2 } },
+    { id: 'sum_2', branch: 'Utility',  name: 'Swift Step',     desc: '+12% Move Speed',    req: 'sum_1', bonus: { speedPct: 0.12 } },
+    { id: 'sum_3', branch: 'Utility',  name: 'Mana Well',      desc: '+30 Max MP',         req: 'sum_2', bonus: { mp: 30 } },
+    { id: 'sum_4', branch: 'Utility',  name: 'Treasure Hunter',desc: '+25% Gold Find',     req: 'sum_3', bonus: { goldPct: 0.25 } }
+  ];
+
+  const WARDROBE_ITEMS = {
+    trails: [
+      { id: 'default', name: 'Steel Spark',    color: '#fde047', reqBoss: null },
+      { id: 'crimson', name: 'Crimson Ash',    color: '#ef4444', reqBoss: 'Malakor, Crypt Warden' },
+      { id: 'frost',   name: 'Glacial Arc',    color: '#38bdf8', reqBoss: 'Vaelgor, Bone Prelate' },
+      { id: 'abyssal', name: 'Abyssal Flame',  color: '#c084fc', reqBoss: 'Azrael, Ashen Sovereign' }
+    ],
+    capes: [
+      { id: 'default', name: 'Class Mantle',   color: null,      reqBoss: null },
+      { id: 'gold',    name: 'Sovereign Cloak',color: '#b45309', reqBoss: 'Malakor, Crypt Warden' },
+      { id: 'shadow',  name: 'Void Shroud',    color: '#312e81', reqBoss: 'Nethys, Blood Matriarch' }
+    ]
+  };
+
+  const BOUNTY_TEMPLATES = [
+    { id: 'b_kill',   title: 'Crypt Purger',    desc: 'Slay 25 Crypt Monsters',     target: 25, type: 'kills',     marks: 3, gold: 140 },
+    { id: 'b_elites', title: 'Champion Hunter', desc: 'Slay 4 Elite Champions',     target: 4,  type: 'elites',    marks: 4, gold: 180 },
+    { id: 'b_boss',   title: 'Guardian Bane',   desc: 'Defeat 1 Floor Boss/Guardian',target: 1, type: 'bosses',    marks: 5, gold: 240 },
+    { id: 'b_chests', title: 'Relic Seeker',    desc: 'Open 3 Events or Chests',    target: 3,  type: 'events',    marks: 3, gold: 150 }
+  ];
 
   const HERO_CLASSES = {
     paladin: {
       id: 'paladin',
       name: 'Paladin',
-      role: 'Armored Crusader',
+      role: 'Crusader (+15% Armor)',
+      passiveDesc: '+15% Block & Armor',
       stats: { str: 14, dex: 9, int: 8, vit: 15 },
-      baseHp: 115,
-      hpPerLvl: 26,
-      baseMp: 75,
-      mpPerLvl: 8,
-      baseAtk: 11,
-      baseArm: 4,
-      baseCrit: 6,
-      speed: 4.65,
-      cloak: '#7f1d1d',
-      armorColor: '#94a3b8',
-      trimColor: '#facc15',
+      baseHp: 120, hpPerLvl: 26, baseMp: 75, mpPerLvl: 8,
+      baseAtk: 11, baseArm: 5, baseCrit: 6, speed: 4.65,
+      defaultWeapon: 'greatsword',
+      cloak: '#7f1d1d', armorColor: '#94a3b8', trimColor: '#facc15',
       basicName: 'SLASH',
+      ultName: 'Avatar of Light',
       skills: {
-        1: { name: 'Whirlwind Cleave', mana: 15, cd: 4.5, elId: 'btnSkill1' },
-        2: { name: 'Fireball',         mana: 20, cd: 3.5, elId: 'btnSkill2' },
-        3: { name: 'Holy Nova',        mana: 28, cd: 7.0, elId: 'btnSkill3' }
+        1: { name: 'Whirlwind Cleave', mana: 15, cd: 4.5, elId: 'btnSkill1', stagger: 14 },
+        2: { name: 'Shield Bash',      mana: 16, cd: 4.0, elId: 'btnSkill2', stagger: 42 },
+        3: { name: 'Holy Nova',        mana: 28, cd: 7.0, elId: 'btnSkill3', stagger: 20 }
       }
     },
     rogue: {
       id: 'rogue',
       name: 'Shadow Rogue',
-      role: 'Agile Skirmisher',
+      role: 'Assassin (+15% Crit)',
+      passiveDesc: '+15% Crit Chance',
       stats: { str: 9, dex: 16, int: 9, vit: 11 },
-      baseHp: 95,
-      hpPerLvl: 20,
-      baseMp: 85,
-      mpPerLvl: 9,
-      baseAtk: 13,
-      baseArm: 2,
-      baseCrit: 12,
-      speed: 5.25,
-      cloak: '#1e293b',
-      armorColor: '#334155',
-      trimColor: '#4ade80',
+      baseHp: 95, hpPerLvl: 20, baseMp: 85, mpPerLvl: 9,
+      baseAtk: 13, baseArm: 2, baseCrit: 20, speed: 5.25,
+      defaultWeapon: 'crossbow',
+      cloak: '#1e293b', armorColor: '#334155', trimColor: '#4ade80',
       basicName: 'TWIN',
+      ultName: 'Shadow Clone Army',
       skills: {
-        1: { name: 'Multishot',   mana: 14, cd: 3.2, elId: 'btnSkill1' },
-        2: { name: 'Poison Trap', mana: 18, cd: 5.5, elId: 'btnSkill2' },
-        3: { name: 'Shadow Dash', mana: 20, cd: 4.5, elId: 'btnSkill3' }
+        1: { name: 'Multishot',   mana: 14, cd: 3.2, elId: 'btnSkill1', stagger: 10 },
+        2: { name: 'Poison Trap', mana: 18, cd: 5.5, elId: 'btnSkill2', stagger: 16 },
+        3: { name: 'Shadow Dash', mana: 20, cd: 4.5, elId: 'btnSkill3', stagger: 22 }
       }
     },
     sorcerer: {
       id: 'sorcerer',
       name: 'Blood Sorcerer',
-      role: 'Arcane Warlock',
+      role: 'Warlock (+20% Spell AoE)',
+      passiveDesc: '+20% Spell AoE & Power',
       stats: { str: 7, dex: 10, int: 17, vit: 11 },
-      baseHp: 90,
-      hpPerLvl: 19,
-      baseMp: 115,
-      mpPerLvl: 13,
-      baseAtk: 14,
-      baseArm: 2,
-      baseCrit: 8,
-      speed: 4.75,
-      cloak: '#4c1d95',
-      armorColor: '#312e81',
-      trimColor: '#c084fc',
+      baseHp: 90, hpPerLvl: 19, baseMp: 120, mpPerLvl: 13,
+      baseAtk: 14, baseArm: 2, baseCrit: 8, speed: 4.75,
+      defaultWeapon: 'arcane_tome',
+      cloak: '#4c1d95', armorColor: '#312e81', trimColor: '#c084fc',
       basicName: 'BOLT',
+      ultName: 'Meteor Apocalypse',
       skills: {
-        1: { name: 'Bone Nova',  mana: 16, cd: 4.0, elId: 'btnSkill1' },
-        2: { name: 'Frost Orb',  mana: 22, cd: 3.8, elId: 'btnSkill2' },
-        3: { name: 'Soul Drain', mana: 26, cd: 6.5, elId: 'btnSkill3' }
+        1: { name: 'Bone Nova',  mana: 16, cd: 4.0, elId: 'btnSkill1', stagger: 16 },
+        2: { name: 'Frost Orb',  mana: 22, cd: 3.8, elId: 'btnSkill2', stagger: 36 },
+        3: { name: 'Soul Drain', mana: 26, cd: 6.5, elId: 'btnSkill3', stagger: 18 }
+      }
+    },
+    archer: {
+      id: 'archer',
+      name: 'Ranger',
+      role: 'Archer (+20% Range/Crit Dmg)',
+      passiveDesc: '+20% Range & Crit Damage',
+      stats: { str: 8, dex: 17, int: 9, vit: 11 },
+      baseHp: 96, hpPerLvl: 20, baseMp: 90, mpPerLvl: 10,
+      baseAtk: 13, baseArm: 2, baseCrit: 12, speed: 5.1,
+      defaultWeapon: 'longbow',
+      cloak: '#14532d', armorColor: '#3f6212', trimColor: '#a3e635',
+      basicName: 'SHOT',
+      ultName: 'Phoenix Volley',
+      skills: {
+        1: { name: 'Arrow Rain',      mana: 18, cd: 4.2, elId: 'btnSkill1', stagger: 14 },
+        2: { name: 'Vault & Caltrops',mana: 16, cd: 4.8, elId: 'btnSkill2', stagger: 34 },
+        3: { name: 'Charged Snipe',   mana: 24, cd: 5.0, elId: 'btnSkill3', stagger: 28 }
+      }
+    },
+    summoner: {
+      id: 'summoner',
+      name: 'Necromancer',
+      role: 'Summoner (+25% Minions)',
+      passiveDesc: '+25% Minion HP & Dmg',
+      stats: { str: 6, dex: 9, int: 17, vit: 13 },
+      baseHp: 98, hpPerLvl: 21, baseMp: 115, mpPerLvl: 12,
+      baseAtk: 11, baseArm: 3, baseCrit: 6, speed: 4.7,
+      defaultWeapon: 'necro_staff',
+      cloak: '#111827', armorColor: '#1f2937', trimColor: '#2dd4bf',
+      basicName: 'SOUL',
+      ultName: 'Summon Bone Colossus',
+      skills: {
+        1: { name: 'Raise Skeletons', mana: 20, cd: 5.0, elId: 'btnSkill1', stagger: 12 },
+        2: { name: 'Summon Hell Imp', mana: 22, cd: 6.0, elId: 'btnSkill2', stagger: 14 },
+        3: { name: 'Dark Pact',       mana: 24, cd: 6.5, elId: 'btnSkill3', stagger: 22 }
       }
     }
   };
@@ -143,27 +293,33 @@
 
   const dom = {
     mainMenuScreen: document.getElementById('mainMenuScreen'),
-    savedHeroCard: document.getElementById('savedHeroCard'),
-    savedHeroName: document.getElementById('savedHeroName'),
-    savedHeroClass: document.getElementById('savedHeroClass'),
-    savedHeroMeta: document.getElementById('savedHeroMeta'),
+    saveSlotGrid: document.getElementById('saveSlotGrid'),
     btnContinueTown: document.getElementById('btnContinueTown'),
     btnOpenCharCreate: document.getElementById('btnOpenCharCreate'),
+    btnOpenCoopMenu: document.getElementById('btnOpenCoopMenu'),
+    btnOpenSaveTransfer: document.getElementById('btnOpenSaveTransfer'),
     btnAudioToggle: document.getElementById('btnAudioToggle'),
     charCreateScreen: document.getElementById('charCreateScreen'),
     heroNameInput: document.getElementById('heroNameInput'),
     btnRandomName: document.getElementById('btnRandomName'),
     classSelectGrid: document.getElementById('classSelectGrid'),
+    petSelectGrid: document.getElementById('petSelectGrid'),
     btnCharCreateBack: document.getElementById('btnCharCreateBack'),
     btnForgeHero: document.getElementById('btnForgeHero'),
     hudTopLeft: document.getElementById('hudTopLeft'),
     hudTopRight: document.getElementById('hudTopRight'),
+    partyPanel: document.getElementById('partyPanel'),
     touchControls: document.getElementById('touchControls'),
     combatCluster: document.getElementById('combatCluster'),
     townQuickBar: document.getElementById('townQuickBar'),
     btnTownForge: document.getElementById('btnTownForge'),
     btnTownStash: document.getElementById('btnTownStash'),
     btnTownApothecary: document.getElementById('btnTownApothecary'),
+    btnTownBounties: document.getElementById('btnTownBounties'),
+    btnTownPets: document.getElementById('btnTownPets'),
+    btnTownCodex: document.getElementById('btnTownCodex'),
+    btnTownWardrobe: document.getElementById('btnTownWardrobe'),
+    btnTownCoop: document.getElementById('btnTownCoop'),
     btnTownWaypoint: document.getElementById('btnTownWaypoint'),
     btnTownMenu: document.getElementById('btnTownMenu'),
     townNpcDrawer: document.getElementById('townNpcDrawer'),
@@ -172,6 +328,12 @@
     townNpcGold: document.getElementById('townNpcGold'),
     btnCloseTownNpc: document.getElementById('btnCloseTownNpc'),
     townNpcBody: document.getElementById('townNpcBody'),
+    saveTransferDrawer: document.getElementById('saveTransferDrawer'),
+    saveCodeInput: document.getElementById('saveCodeInput'),
+    btnCopySaveCode: document.getElementById('btnCopySaveCode'),
+    btnImportSaveCode: document.getElementById('btnImportSaveCode'),
+    btnCloseSaveTransfer: document.getElementById('btnCloseSaveTransfer'),
+    dragGhost: document.getElementById('dragGhost'),
     hpOrbFill: document.getElementById('hpOrbFill'),
     hpText: document.getElementById('hpText'),
     mpOrbFill: document.getElementById('mpOrbFill'),
@@ -182,10 +344,13 @@
     floorBadge: document.getElementById('floorBadge'),
     seedBadge: document.getElementById('seedBadge'),
     buffBadge: document.getElementById('buffBadge'),
+    conditionBadge: document.getElementById('conditionBadge'),
     bossBar: document.getElementById('bossBar'),
     bossName: document.getElementById('bossName'),
+    bossPhaseBadge: document.getElementById('bossPhaseBadge'),
     bossHpText: document.getElementById('bossHpText'),
     bossHpFill: document.getElementById('bossHpFill'),
+    bossStaggerFill: document.getElementById('bossStaggerFill'),
     toastBanner: document.getElementById('toastBanner'),
     btnInventory: document.getElementById('btnInventory'),
     lootCountBadge: document.getElementById('lootCountBadge'),
@@ -194,18 +359,30 @@
     btnTownPortal: document.getElementById('btnTownPortal'),
     btnLootFilter: document.getElementById('btnLootFilter'),
     lootFilterLabel: document.getElementById('lootFilterLabel'),
+    btnManualSave: document.getElementById('btnManualSave'),
     btnHudAudio: document.getElementById('btnHudAudio'),
     hudAudioLabel: document.getElementById('hudAudioLabel'),
     joystickZone: document.getElementById('joystickZone'),
     joystickKnob: document.getElementById('joystickKnob'),
     btnAttack: document.getElementById('btnAttack'),
+    attackUltGlow: document.getElementById('attackUltGlow'),
     attackLabel: document.getElementById('attackLabel'),
     btnSkill1: document.getElementById('btnSkill1'),
     btnSkill2: document.getElementById('btnSkill2'),
     btnSkill3: document.getElementById('btnSkill3'),
+    btnSkill4: document.getElementById('btnSkill4'),
     skill1Cost: document.getElementById('skill1Cost'),
     skill2Cost: document.getElementById('skill2Cost'),
     skill3Cost: document.getElementById('skill3Cost'),
+    skill4Label: document.getElementById('skill4Label'),
+    skill4Cost: document.getElementById('skill4Cost'),
+    btnUltimate: document.getElementById('btnUltimate'),
+    ultPctText: document.getElementById('ultPctText'),
+    btnDodge: document.getElementById('btnDodge'),
+    btnSwapLoadout: document.getElementById('btnSwapLoadout'),
+    swapLoadoutLabel: document.getElementById('swapLoadoutLabel'),
+    btnMinionStance: document.getElementById('btnMinionStance'),
+    minionStanceLabel: document.getElementById('minionStanceLabel'),
     btnPotion: document.getElementById('btnPotion'),
     potionCount: document.getElementById('potionCount'),
     btnManaElixir: document.getElementById('btnManaElixir'),
@@ -216,10 +393,24 @@
     btnRespawnNew: document.getElementById('btnRespawnNew'),
     inventoryDrawer: document.getElementById('inventoryDrawer'),
     invGold: document.getElementById('invGold'),
+    invDust: document.getElementById('invDust'),
+    invEssence: document.getElementById('invEssence'),
     invCapacity: document.getElementById('invCapacity'),
     btnCloseInventory: document.getElementById('btnCloseInventory'),
+    invTabGear: document.getElementById('invTabGear'),
+    invTabSkills: document.getElementById('invTabSkills'),
+    invTabMastery: document.getElementById('invTabMastery'),
+    spBadge: document.getElementById('spBadge'),
+    mpBadge: document.getElementById('mpBadge'),
+    invGearPanel: document.getElementById('invGearPanel'),
+    invSkillsPanel: document.getElementById('invSkillsPanel'),
+    invMasteryPanel: document.getElementById('invMasteryPanel'),
     heroStatsStrip: document.getElementById('heroStatsStrip'),
-    equippedSlots: document.getElementById('equippedSlots'),
+    paperDollGrid: document.getElementById('paperDollGrid'),
+    swapSetStrip: document.getElementById('swapSetStrip'),
+    setBonusSummary: document.getElementById('setBonusSummary'),
+    btnSortBag: document.getElementById('btnSortBag'),
+    invSalvageDropZone: document.getElementById('invSalvageDropZone'),
     itemComparePanel: document.getElementById('itemComparePanel'),
     backpackGrid: document.getElementById('backpackGrid')
   };
@@ -518,70 +709,132 @@
     return c;
   }
 
-  function buildGlowSprite(innerColor, midColor, radius) {
-    const c = makeCanvas(radius * 2, radius * 2);
+  function tintSprite(srcCanvas, tintRgba) {
+    if (!tintRgba) return srcCanvas;
+    const c = makeCanvas(srcCanvas.width, srcCanvas.height);
     const g = c.getContext('2d');
-    const grad = g.createRadialGradient(radius, radius, 2, radius, radius, radius);
-    grad.addColorStop(0, innerColor);
-    grad.addColorStop(0.5, midColor);
-    grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    g.fillStyle = grad;
-    g.fillRect(0, 0, radius * 2, radius * 2);
+    g.drawImage(srcCanvas, 0, 0);
+    g.globalCompositeOperation = 'source-atop';
+    g.fillStyle = tintRgba;
+    g.fillRect(0, 0, c.width, c.height);
+    g.globalCompositeOperation = 'source-over';
     return c;
   }
 
   function buildTextureAtlas() {
-    atlas.floors = [
+    const baseFloors = [
       buildFloorSprite(0, 'normal'),
       buildFloorSprite(1, 'normal'),
       buildFloorSprite(2, 'normal')
     ];
+    const baseWall = buildWallSprite();
+    atlas.floors = baseFloors;
     atlas.sanctum = buildFloorSprite(0, 'sanctum');
     atlas.bossFloor = buildFloorSprite(0, 'boss');
-    atlas.wall = buildWallSprite();
+    atlas.wall = baseWall;
     atlas.urn = buildPropSprite('urn');
     atlas.barrel = buildPropSprite('barrel');
     atlas.torchGlow = buildGlowSprite('rgba(249, 115, 22, 0.26)', 'rgba(217, 119, 6, 0.10)', 74);
     atlas.arcaneGlow = buildGlowSprite('rgba(59, 130, 246, 0.28)', 'rgba(37, 99, 235, 0.09)', 74);
+    atlas.biomes = {};
+    for (const [bId, b] of Object.entries(BIOMES)) {
+      atlas.biomes[bId] = {
+        floors: baseFloors.map((sp) => tintSprite(sp, b.floorTint)),
+        wall: tintSprite(baseWall, b.wallTint)
+      };
+    }
   }
 
   // =========================================================================
-  // HERO, GEAR & PERSISTENCE STATE
+  // HERO, GEAR & 3-SLOT PERSISTENCE STATE
   // =========================================================================
   function createStarterGear(classId = 'paladin') {
-    if (classId === 'rogue') {
-      return {
-        weapon: { id: 'starter_twin', name: 'Shadowfang Daggers', slot: 'weapon', rarity: 'common', stats: { atk: 11, crit: 8 } },
-        helm:   { id: 'starter_hood', name: 'Nightstalker Cowl',  slot: 'helm',   rarity: 'common', stats: { hp: 14, arm: 2 } },
-        armor:  { id: 'starter_coat', name: 'Ravenhide Jerkin',   slot: 'armor',  rarity: 'common', stats: { hp: 22, arm: 4 } },
-        ring: null
-      };
-    }
-    if (classId === 'sorcerer') {
-      return {
-        weapon: { id: 'starter_staff', name: 'Bonechannel Rod',   slot: 'weapon', rarity: 'common', stats: { atk: 13, crit: 5 } },
-        helm:   { id: 'starter_circ',  name: 'Hexwoven Crown',    slot: 'helm',   rarity: 'common', stats: { hp: 12, arm: 2 } },
-        armor:  { id: 'starter_robe',  name: 'Bloodsilk Vestment',slot: 'armor',  rarity: 'common', stats: { hp: 20, arm: 3 } },
-        ring: null
-      };
-    }
+    const cls = HERO_CLASSES[classId] || HERO_CLASSES.paladin;
+    const wType = cls.defaultWeapon || 'greatsword';
+    const wNames = {
+      greatsword: 'Iron Broadsword', warhammer: 'Crusader Maul',
+      longbow: 'Yew Recurve Bow', crossbow: 'Shadowfang Repeater',
+      necro_staff: 'Bonechannel Staff', arcane_tome: 'Bloodbound Grimoire'
+    };
     return {
-      weapon: { id: 'starter_blade', name: 'Iron Broadsword',   slot: 'weapon', rarity: 'common', stats: { atk: 12, crit: 4 } },
-      helm:   { id: 'starter_helm',  name: 'Tempered Barbute',  slot: 'helm',   rarity: 'common', stats: { hp: 20, arm: 3 } },
-      armor:  { id: 'starter_armor', name: 'Cryptguard Cuirass',slot: 'armor',  rarity: 'common', stats: { hp: 30, arm: 6 } },
-      ring: null
+      weapon:  { id: 'starter_wpn', name: wNames[wType] || 'Iron Broadsword', slot: 'weapon', weaponType: wType, rarity: 'common', stats: { atk: 12, crit: 4 }, sockets: 1, gems: [] },
+      offhand: null,
+      helm:    { id: 'starter_helm', name: 'Wayfarer Hood', slot: 'helm', rarity: 'common', stats: { hp: 18, arm: 3 }, sockets: 0, gems: [] },
+      armor:   { id: 'starter_armor', name: 'Cryptguard Coat', slot: 'armor', rarity: 'common', stats: { hp: 28, arm: 5 }, sockets: 1, gems: [] },
+      boots:   { id: 'starter_boots', name: 'Ironshod Greaves', slot: 'boots', rarity: 'common', stats: { arm: 2, spd: 4 }, sockets: 0, gems: [] },
+      ring:    null,
+      amulet:  null
+    };
+  }
+
+  function defaultAccountData() {
+    return {
+      stash: [],
+      bestiary: {},
+      wardrobeUnlocked: { trails: ['default'], capes: ['default'] },
+      equippedTrail: 'default',
+      equippedCape: 'default',
+      bestRiftTier: 0,
+      mercenaryMarks: 0,
+      bounties: BOUNTY_TEMPLATES.slice(0, 3).map((b) => ({ id: b.id, title: b.title, desc: b.desc, type: b.type, target: b.target, prog: 0, marks: b.marks, gold: b.gold, claimed: false }))
+    };
+  }
+
+  function createFreshHeroSlotData(heroName = 'Aldric', classId = 'paladin', petId = 'hound') {
+    const cls = HERO_CLASSES[classId] ? classId : 'paladin';
+    const equipped = createStarterGear(cls);
+    return {
+      v: VERSION,
+      heroName,
+      heroClass: cls,
+      highestFloor: 1,
+      floor: 1,
+      seed: Math.floor(1000 + Math.random() * 8999),
+      level: 1,
+      xp: 0,
+      nextXp: 100,
+      gold: 120,
+      dust: 10,
+      essence: 0,
+      potions: 3,
+      manaElixirs: 2,
+      repairKits: 1,
+      durability: 100,
+      kills: 0,
+      skillPoints: 1,
+      masteryPoints: 0,
+      skillRanks: { 1: 1, 2: 1, 3: 1 },
+      masteryUnlocked: [],
+      petId: PETS_CONFIG[petId] ? petId : 'hound',
+      petRanks: { hound: 1, wisp: 1, hatchling: 1 },
+      petXp: 0,
+      equipped,
+      swapSet: { weapon: null, offhand: null },
+      bag: [],
+      activeBuff: null
     };
   }
 
   const state = {
-    screen: 'MAIN_MENU', // 'MAIN_MENU' | 'CHAR_CREATE' | 'TOWN' | 'DUNGEON'
-    mode: 'TOWN',        // 'TOWN' | 'DUNGEON'
+    screen: 'MAIN_MENU',
+    mode: 'TOWN',
+    activeSlot: 0,
+    saveSlots: [null, null, null],
+    account: defaultAccountData(),
     selectedCreateClass: 'paladin',
+    selectedCreatePet: 'hound',
     heroName: 'Aldric',
     heroClass: 'paladin',
     highestFloor: 1,
     floor: 1,
     seed: 1047,
+    mapSize: 'standard',
+    biome: 'crypt',
+    riftTier: 0,
+    riftTimer: 0,
+    floorCondition: 'calm',
+    torchFuel: 100,
+    infamyStreak: 0,
     rng: null,
     grid: [],
     tileVariant: [],
@@ -592,9 +845,21 @@
     waypointArmed: false,
     torches: [],
     gates: [],
+    levers: [],
+    runePlates: [],
+    runeBridges: [],
+    mirrorPads: [],
+    secretWalls: [],
+    traps: [],
+    events: [],
+    crystals: [],
+    bossTelegraphs: [],
     props: [],
     townNpcs: [],
     monsters: [],
+    minions: [],
+    petEntity: null,
+    minionStance: 'aggressive', // 'aggressive' | 'guard'
     lootDrops: [],
     projectiles: [],
     poisonClouds: [],
@@ -604,39 +869,31 @@
     novaWaves: [],
     camera: { x: 0, y: 0, shake: 0 },
     player: {
-      x: 5,
-      y: 5,
-      vx: 0,
-      vy: 0,
-      facingX: 1,
-      facingY: 0,
-      hp: 150,
-      maxHp: 150,
-      mp: 80,
-      maxMp: 80,
-      level: 1,
-      xp: 0,
-      nextXp: 100,
-      gold: 0,
-      potions: 3,
-      manaElixirs: 1,
-      walkPhase: 0,
-      attackAnim: 0,
-      castAnim: 0,
-      attackCd: 0,
-      potionCd: 0,
-      chillTimer: 0,
-      skillCds: { 1: 0, 2: 0, 3: 0 },
-      hitFlash: 0,
-      dead: false,
-      kills: 0,
+      x: 5, y: 5, vx: 0, vy: 0, facingX: 1, facingY: 0,
+      hp: 150, maxHp: 150, mp: 80, maxMp: 80,
+      level: 1, xp: 0, nextXp: 100, gold: 120,
+      dust: 10, essence: 0, potions: 3, manaElixirs: 2, repairKits: 1, durability: 100,
+      bladeOil: null, // { type: 'burn'|'poison'|'chill'|'bleed', label, timer }
+      walkPhase: 0, attackAnim: 0, castAnim: 0,
+      attackCd: 0, potionCd: 0, dodgeCd: 0, invulnTimer: 0, chillTimer: 0,
+      ultCharge: 0, ultTimer: 0,
+      skillCds: { 1: 0, 2: 0, 3: 0, 4: 0 },
+      skillPoints: 1, masteryPoints: 0,
+      skillRanks: { 1: 1, 2: 1, 3: 1 },
+      masteryUnlocked: [],
+      petId: 'hound',
+      petRanks: { hound: 1, wisp: 1, hatchling: 1 },
+      petXp: 0,
+      hitFlash: 0, dead: false, kills: 0,
       equipped: createStarterGear('paladin'),
+      swapSet: { weapon: null, offhand: null },
+      activeSwapIdx: 1,
       bag: []
     },
-    activeBuff: null, // { id, label, crit, speed, gold }
-    stash: [],
+    activeBuff: null,
     blacksmithStock: [],
     lootFilter: 'all',
+    invTab: 'gear',
     selectedInspect: null,
     pendingLootTarget: null,
     toastTimer: 0,
@@ -647,35 +904,127 @@
     hudCache: {}
   };
 
+  function getSetCounts() {
+    const counts = {};
+    for (const slot of SLOTS) {
+      const it = state.player.equipped[slot];
+      if (it && it.setId) counts[it.setId] = (counts[it.setId] || 0) + 1;
+    }
+    return counts;
+  }
+
   function getHeroStats() {
     const p = state.player;
     const cls = HERO_CLASSES[state.heroClass] || HERO_CLASSES.paladin;
+    const durScale = p.durability <= 0 ? 0.8 : 1;
     const totals = {
       atk: cls.baseAtk + (p.level - 1) * 4,
       crit: cls.baseCrit + (p.level - 1) * 0.6,
+      critDmg: state.heroClass === 'archer' ? 2.05 : 1.85,
       maxHp: cls.baseHp + (p.level - 1) * cls.hpPerLvl,
       maxMp: cls.baseMp + (p.level - 1) * cls.mpPerLvl,
       loh: 0,
       arm: cls.baseArm + (p.level - 1) * 1.5,
       speed: cls.speed,
-      goldBonus: 1
+      goldBonus: 1,
+      minionMult: state.heroClass === 'summoner' ? 1.25 : 1.0,
+      aoeMult: state.heroClass === 'sorcerer' ? 1.2 : 1.0,
+      ultRate: 1.0,
+      dr: 0
     };
+
+    let atkPct = 0, armPct = state.heroClass === 'paladin' ? 0.15 : 0, speedPct = 0;
+
     for (const slot of SLOTS) {
       const item = p.equipped[slot];
       if (!item || !item.stats) continue;
-      totals.atk += item.stats.atk || 0;
-      totals.crit += item.stats.crit || 0;
-      totals.maxHp += item.stats.hp || 0;
-      totals.loh += item.stats.loh || 0;
-      totals.arm += item.stats.arm || 0;
+      totals.atk += Math.round((item.stats.atk || 0) * durScale);
+      totals.crit += (item.stats.crit || 0) * durScale;
+      totals.maxHp += Math.round((item.stats.hp || 0) * durScale);
+      totals.loh += Math.round((item.stats.loh || 0) * durScale);
+      totals.arm += Math.round((item.stats.arm || 0) * durScale);
+      if (item.stats.spd) speedPct += item.stats.spd * 0.01;
+      if (Array.isArray(item.gems)) {
+        for (const gId of item.gems) {
+          const g = GEM_DEFS[gId];
+          if (!g) continue;
+          if (g.stat === 'atk') totals.atk += g.val;
+          else if (g.stat === 'mp') totals.maxMp += g.val;
+          else if (g.stat === 'crit') totals.crit += g.val;
+          else if (g.stat === 'loh') totals.loh += g.val;
+        }
+      }
     }
+
+    // Set bonuses
+    const setCounts = getSetCounts();
+    for (const [sId, cnt] of Object.entries(setCounts)) {
+      const def = SET_DEFS[sId];
+      if (!def) continue;
+      const applyB = (b) => {
+        if (!b) return;
+        if (b.armPct) armPct += b.armPct;
+        if (b.hp) totals.maxHp += b.hp;
+        if (b.mp) totals.maxMp += b.mp;
+        if (b.atkPct) atkPct += b.atkPct;
+        if (b.crit) totals.crit += b.crit;
+        if (b.critDmg) totals.critDmg += b.critDmg;
+        if (b.speedPct) speedPct += b.speedPct;
+        if (b.minionPct) totals.minionMult += b.minionPct;
+        if (b.loh) totals.loh += b.loh;
+      };
+      if (cnt >= 2) applyB(def.bonus2);
+      if (cnt >= 4) applyB(def.bonus4);
+    }
+
+    // Mastery Constellation bonuses
+    for (const mId of p.masteryUnlocked || []) {
+      const node = MASTERY_NODES.find((n) => n.id === mId);
+      if (!node || !node.bonus) continue;
+      const b = node.bonus;
+      if (b.atkPct) atkPct += b.atkPct;
+      if (b.crit) totals.crit += b.crit;
+      if (b.critDmg) totals.critDmg += b.critDmg;
+      if (b.ultRate) totals.ultRate += b.ultRate;
+      if (b.armPct) armPct += b.armPct;
+      if (b.hp) totals.maxHp += b.hp;
+      if (b.loh) totals.loh += b.loh;
+      if (b.dr) totals.dr += b.dr;
+      if (b.minionPct) totals.minionMult += b.minionPct;
+      if (b.speedPct) speedPct += b.speedPct;
+      if (b.mp) totals.maxMp += b.mp;
+      if (b.goldPct) totals.goldBonus += b.goldPct;
+    }
+
+    // Active Pet passive
+    const pet = PETS_CONFIG[p.petId];
+    if (pet && pet.passive) {
+      const rankScale = 1 + ((p.petRanks[p.petId] || 1) - 1) * 0.2;
+      if (pet.passive.speedPct) speedPct += pet.passive.speedPct * rankScale;
+      if (pet.passive.goldPct) totals.goldBonus += pet.passive.goldPct * rankScale;
+      if (pet.passive.armPct) armPct += pet.passive.armPct * rankScale;
+    }
+
+    // Bestiary micro-bonuses (+1 ATK per 25 total kills, capped at +20)
+    let totalBestiaryKills = 0;
+    for (const k of Object.values(state.account.bestiary || {})) totalBestiaryKills += k;
+    totals.atk += Math.min(20, Math.floor(totalBestiaryKills / 25));
+
     if (state.activeBuff) {
       if (state.activeBuff.crit) totals.crit += state.activeBuff.crit;
-      if (state.activeBuff.speed) totals.speed *= (1 + state.activeBuff.speed);
+      if (state.activeBuff.speed) speedPct += state.activeBuff.speed;
       if (state.activeBuff.gold) totals.goldBonus += state.activeBuff.gold;
     }
+
+    totals.atk = Math.round(totals.atk * (1 + atkPct));
+    totals.arm = Math.round(totals.arm * (1 + armPct));
+    totals.speed *= (1 + speedPct);
     if (p.chillTimer > 0) totals.speed *= 0.7;
-    totals.crit = Math.min(75, Math.round(totals.crit * 10) / 10);
+    if (p.ultTimer > 0 && state.heroClass === 'paladin') {
+      totals.atk = Math.round(totals.atk * 1.45);
+      totals.speed *= 1.25;
+    }
+    totals.crit = Math.min(80, Math.round(totals.crit * 10) / 10);
     return totals;
   }
 
@@ -687,51 +1036,97 @@
     state.player.mp = Math.min(state.player.mp, state.player.maxMp);
   }
 
-  function saveHeroProfile() {
+  function snapshotActiveSlot() {
+    const p = state.player;
+    return {
+      v: VERSION,
+      heroName: state.heroName,
+      heroClass: state.heroClass,
+      highestFloor: state.highestFloor,
+      floor: state.floor,
+      seed: state.seed,
+      level: p.level,
+      xp: p.xp,
+      nextXp: p.nextXp,
+      gold: p.gold,
+      dust: p.dust,
+      essence: p.essence,
+      potions: p.potions,
+      manaElixirs: p.manaElixirs,
+      repairKits: p.repairKits,
+      durability: p.durability,
+      kills: p.kills,
+      skillPoints: p.skillPoints,
+      masteryPoints: p.masteryPoints,
+      skillRanks: p.skillRanks,
+      masteryUnlocked: p.masteryUnlocked,
+      petId: p.petId,
+      petRanks: p.petRanks,
+      petXp: p.petXp,
+      equipped: p.equipped,
+      swapSet: p.swapSet,
+      bag: p.bag,
+      activeBuff: state.activeBuff
+    };
+  }
+
+  function saveAccount() {
     try {
-      const p = state.player;
-      const payload = {
-        v: VERSION,
-        heroName: state.heroName,
-        heroClass: state.heroClass,
-        highestFloor: state.highestFloor,
-        floor: state.floor,
-        seed: state.seed,
-        level: p.level,
-        xp: p.xp,
-        nextXp: p.nextXp,
-        gold: p.gold,
-        potions: p.potions,
-        manaElixirs: p.manaElixirs,
-        kills: p.kills,
-        equipped: p.equipped,
-        bag: p.bag,
-        activeBuff: state.activeBuff
-      };
-      localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
+      localStorage.setItem(ACCOUNT_KEY, JSON.stringify(state.account));
+    } catch (_) {}
+  }
+
+  function saveHeroProfile(toastConfirm = false) {
+    try {
+      state.saveSlots[state.activeSlot] = snapshotActiveSlot();
+      localStorage.setItem(SAVE_SLOTS_KEY, JSON.stringify(state.saveSlots));
+      saveAccount();
+      if (toastConfirm) showToast(`Saved Slot ${state.activeSlot + 1} (${state.heroName})`);
     } catch (_) {}
   }
   const saveProgress = saveHeroProfile;
+  const saveStash = saveAccount;
 
-  function saveStash() {
-    try {
-      localStorage.setItem(STASH_KEY, JSON.stringify(state.stash.slice(0, MAX_STASH_SLOTS)));
-    } catch (_) {}
-  }
+  function applySlotDataToRuntime(data) {
+    const base = createFreshHeroSlotData(data.heroName || 'Aldric', data.heroClass || 'paladin', data.petId || 'hound');
+    const merged = Object.assign(base, data);
+    state.heroName = merged.heroName;
+    state.heroClass = HERO_CLASSES[merged.heroClass] ? merged.heroClass : 'paladin';
+    state.highestFloor = Math.max(1, merged.highestFloor || 1);
+    state.floor = Math.max(1, merged.floor || 1);
+    state.seed = merged.seed || 1047;
+    state.activeBuff = merged.activeBuff || null;
 
-  function loadStash() {
-    try {
-      const raw = localStorage.getItem(STASH_KEY);
-      if (raw) {
-        const arr = JSON.parse(raw);
-        if (Array.isArray(arr)) state.stash = arr.slice(0, MAX_STASH_SLOTS);
-      }
-    } catch (_) {}
+    const p = state.player;
+    p.level = merged.level || 1;
+    p.xp = merged.xp || 0;
+    p.nextXp = merged.nextXp || 100;
+    p.gold = merged.gold ?? 120;
+    p.dust = merged.dust ?? 10;
+    p.essence = merged.essence ?? 0;
+    p.potions = merged.potions ?? 3;
+    p.manaElixirs = merged.manaElixirs ?? 2;
+    p.repairKits = merged.repairKits ?? 1;
+    p.durability = merged.durability ?? 100;
+    p.kills = merged.kills || 0;
+    p.skillPoints = merged.skillPoints ?? 1;
+    p.masteryPoints = merged.masteryPoints ?? 0;
+    p.skillRanks = Object.assign({ 1: 1, 2: 1, 3: 1 }, merged.skillRanks || {});
+    p.masteryUnlocked = Array.isArray(merged.masteryUnlocked) ? merged.masteryUnlocked : [];
+    p.petId = PETS_CONFIG[merged.petId] ? merged.petId : 'hound';
+    p.petRanks = Object.assign({ hound: 1, wisp: 1, hatchling: 1 }, merged.petRanks || {});
+    p.petXp = merged.petXp || 0;
+    p.equipped = Object.assign(createStarterGear(state.heroClass), merged.equipped || {});
+    p.swapSet = Object.assign({ weapon: null, offhand: null }, merged.swapSet || {});
+    p.bag = Array.isArray(merged.bag) ? merged.bag.slice(0, MAX_BAG_SLOTS) : [];
+    syncPlayerVitalsBounds();
+    p.hp = p.maxHp;
+    p.mp = p.maxMp;
   }
 
   function savePrefs() {
     try {
-      localStorage.setItem(PREFS_KEY, JSON.stringify({ muted: sfx.muted, lootFilter: state.lootFilter }));
+      localStorage.setItem(PREFS_KEY, JSON.stringify({ muted: sfx.muted, lootFilter: state.lootFilter, mapSize: state.mapSize }));
     } catch (_) {}
   }
 
@@ -742,56 +1137,117 @@
       const pr = JSON.parse(raw);
       if (typeof pr.muted === 'boolean') sfx.muted = pr.muted;
       if (LOOT_FILTER_MODES.includes(pr.lootFilter)) state.lootFilter = pr.lootFilter;
+      if (MAP_SIZES[pr.mapSize]) state.mapSize = pr.mapSize;
     } catch (_) {}
   }
 
   function loadProgress() {
-    let hasSave = false;
     try {
-      const raw = localStorage.getItem(SAVE_KEY) || localStorage.getItem(LEGACY_SAVE_KEY);
-      if (raw) {
-        const data = JSON.parse(raw);
-        if (data && typeof data === 'object') {
-          hasSave = true;
-          const p = state.player;
-          if (typeof data.heroName === 'string' && data.heroName.trim()) state.heroName = data.heroName.trim();
-          if (HERO_CLASSES[data.heroClass]) state.heroClass = data.heroClass;
-          if (Number.isFinite(data.floor) && data.floor >= 1) state.floor = data.floor;
-          if (Number.isFinite(data.highestFloor) && data.highestFloor >= 1) {
-            state.highestFloor = Math.max(state.floor, data.highestFloor);
-          } else {
-            state.highestFloor = state.floor;
-          }
-          if (Number.isFinite(data.seed)) state.seed = data.seed;
-          if (Number.isFinite(data.level) && data.level >= 1) p.level = data.level;
-          if (Number.isFinite(data.xp)) p.xp = data.xp;
-          if (Number.isFinite(data.nextXp)) p.nextXp = data.nextXp;
-          if (Number.isFinite(data.gold)) p.gold = data.gold;
-          if (Number.isFinite(data.potions)) p.potions = data.potions;
-          if (Number.isFinite(data.manaElixirs)) p.manaElixirs = data.manaElixirs;
-          if (Number.isFinite(data.kills)) p.kills = data.kills;
-          if (data.equipped) p.equipped = Object.assign(createStarterGear(state.heroClass), data.equipped);
-          if (Array.isArray(data.bag)) p.bag = data.bag.slice(0, MAX_BAG_SLOTS);
-          if (data.activeBuff && typeof data.activeBuff === 'object') state.activeBuff = data.activeBuff;
+      const rawAcc = localStorage.getItem(ACCOUNT_KEY);
+      if (rawAcc) {
+        state.account = Object.assign(defaultAccountData(), JSON.parse(rawAcc));
+      } else {
+        const legacyStash = localStorage.getItem(LEGACY_STASH_KEY);
+        if (legacyStash) {
+          const arr = JSON.parse(legacyStash);
+          if (Array.isArray(arr)) state.account.stash = arr.slice(0, MAX_STASH_SLOTS);
         }
       }
     } catch (_) {}
-    loadStash();
+
+    let loaded = false;
+    try {
+      const rawSlots = localStorage.getItem(SAVE_SLOTS_KEY);
+      if (rawSlots) {
+        const arr = JSON.parse(rawSlots);
+        if (Array.isArray(arr)) {
+          state.saveSlots = [arr[0] || null, arr[1] || null, arr[2] || null];
+          const firstIdx = state.saveSlots.findIndex(Boolean);
+          if (firstIdx !== -1) {
+            state.activeSlot = firstIdx;
+            applySlotDataToRuntime(state.saveSlots[firstIdx]);
+            loaded = true;
+          }
+        }
+      } else {
+        const legacyRaw = localStorage.getItem(LEGACY_SAVE_KEY_V020) || localStorage.getItem(LEGACY_SAVE_KEY_V010);
+        if (legacyRaw) {
+          const legacyData = JSON.parse(legacyRaw);
+          if (legacyData && typeof legacyData === 'object') {
+            state.activeSlot = 0;
+            applySlotDataToRuntime(legacyData);
+            state.saveSlots[0] = snapshotActiveSlot();
+            loaded = true;
+          }
+        }
+      }
+    } catch (_) {}
+
     loadPrefs();
     syncPlayerVitalsBounds();
     state.player.hp = state.player.maxHp;
     state.player.mp = state.player.maxMp;
-    return hasSave;
+    return loaded;
+  }
+
+  function exportSaveCode() {
+    saveHeroProfile();
+    const bundle = { v: VERSION, slots: state.saveSlots, account: state.account };
+    return btoa(unescape(encodeURIComponent(JSON.stringify(bundle))));
+  }
+
+  function importSaveCode(codeStr) {
+    try {
+      const json = decodeURIComponent(escape(atob(String(codeStr || '').trim())));
+      const parsed = JSON.parse(json);
+      if (!parsed || !Array.isArray(parsed.slots)) return false;
+      state.saveSlots = [parsed.slots[0] || null, parsed.slots[1] || null, parsed.slots[2] || null];
+      if (parsed.account) state.account = Object.assign(defaultAccountData(), parsed.account);
+      const firstIdx = state.saveSlots.findIndex(Boolean);
+      if (firstIdx !== -1) {
+        state.activeSlot = firstIdx;
+        applySlotDataToRuntime(state.saveSlots[firstIdx]);
+      }
+      localStorage.setItem(SAVE_SLOTS_KEY, JSON.stringify(state.saveSlots));
+      saveAccount();
+      renderMainMenuSummary();
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   // =========================================================================
   // PROCEDURAL DUNGEON GENERATOR
   // =========================================================================
-  function generateDungeon(seed, floor) {
+  function ensureMapCanvases() {
+    const targetW = MAP_W * 4;
+    if (fogLightCanvas.width !== targetW) {
+      fogLightCanvas.width = targetW;
+      fogLightCanvas.height = MAP_H * 4;
+    }
+  }
+
+  function generateDungeon(seed, floor, opts = {}) {
     state.seed = (seed >>> 0) || 1047;
     state.floor = Math.max(1, floor | 0);
+    const sizeCfg = MAP_SIZES[opts.mapSize || state.mapSize] || MAP_SIZES.standard;
+    MAP_W = sizeCfg.dim;
+    MAP_H = sizeCfg.dim;
+    ensureMapCanvases();
+
     const rng = mulberry32(state.seed ^ (state.floor * 7919));
     state.rng = rng;
+
+    const biomeKeys = Object.keys(BIOMES);
+    state.biome = opts.biome || biomeKeys[(state.floor - 1) % biomeKeys.length];
+    state.riftTier = opts.riftTier || 0;
+    state.riftTimer = state.riftTier > 0 ? 180 : 0;
+    const condRoll = rng();
+    state.floorCondition = state.riftTier > 0
+      ? 'blood_moon'
+      : condRoll < 0.25 ? 'cursed_fog' : condRoll < 0.45 ? 'blood_moon' : condRoll < 0.62 ? 'volatile_vents' : 'calm';
+    state.torchFuel = 100;
 
     state.grid = Array.from({ length: MAP_H }, () => new Uint8Array(MAP_W));
     state.tileVariant = Array.from({ length: MAP_H }, () => new Uint8Array(MAP_W));
@@ -799,19 +1255,30 @@
     state.rooms = [];
     state.torches = [];
     state.gates = [];
+    state.levers = [];
+    state.runePlates = [];
+    state.runeBridges = [];
+    state.mirrorPads = [];
+    state.secretWalls = [];
+    state.traps = [];
+    state.events = [];
+    state.crystals = [];
+    state.bossTelegraphs = [];
     state.props = [];
     state.monsters = [];
+    state.minions = [];
     state.lootDrops = [];
     state.projectiles = [];
+    state.poisonClouds = [];
     state.particles = [];
     state.floatTexts = [];
     state.slashArcs = [];
     state.novaWaves = [];
     state.pendingLootTarget = null;
 
-    // 1. Place 8-10 non-overlapping rectangular chambers
-    const targetRooms = randInt(rng, 8, 10);
-    for (let attempt = 0; attempt < 160 && state.rooms.length < targetRooms; attempt++) {
+    // 1. Place non-overlapping rectangular chambers based on map size preset
+    const targetRooms = randInt(rng, sizeCfg.rooms[0], sizeCfg.rooms[1]);
+    for (let attempt = 0; attempt < 240 && state.rooms.length < targetRooms; attempt++) {
       const rw = randInt(rng, 5, 8);
       const rh = randInt(rng, 5, 8);
       const rx = randInt(rng, 2, MAP_W - rw - 3);
@@ -827,26 +1294,21 @@
       if (!overlaps) {
         state.rooms.push({
           id: state.rooms.length,
-          x: rx,
-          y: ry,
-          w: rw,
-          h: rh,
+          x: rx, y: ry, w: rw, h: rh,
           cx: Math.floor(rx + rw * 0.5),
           cy: Math.floor(ry + rh * 0.5)
         });
       }
     }
 
-    // Fallback safety if RNG packed unusually
     if (state.rooms.length < 3) {
       state.rooms = [
         { id: 0, x: 4, y: 4, w: 6, h: 6, cx: 7, cy: 7 },
-        { id: 1, x: 16, y: 14, w: 7, h: 7, cx: 19, cy: 17 },
-        { id: 2, x: 28, y: 26, w: 7, h: 7, cx: 31, cy: 29 }
+        { id: 1, x: 14, y: 12, w: 7, h: 7, cx: 17, cy: 15 },
+        { id: 2, x: 24, y: 22, w: 7, h: 7, cx: 27, cy: 25 }
       ];
     }
 
-    // Carve rooms
     for (const r of state.rooms) {
       for (let y = r.y; y < r.y + r.h; y++) {
         for (let x = r.x; x < r.x + r.w; x++) {
@@ -856,22 +1318,16 @@
       }
     }
 
-    // 2. Connect rooms with Prim MST + 2 loop corridors (2-tile wide)
+    // 2. Connect rooms with Prim MST + confusing loop & dead-end corridors
     const connected = new Set([0]);
     const edges = [];
     while (connected.size < state.rooms.length) {
-      let bestA = 0;
-      let bestB = 0;
-      let bestD = Infinity;
+      let bestA = 0, bestB = 0, bestD = Infinity;
       for (const a of connected) {
         for (let b = 0; b < state.rooms.length; b++) {
           if (connected.has(b)) continue;
           const d = dist(state.rooms[a].cx, state.rooms[a].cy, state.rooms[b].cx, state.rooms[b].cy);
-          if (d < bestD) {
-            bestD = d;
-            bestA = a;
-            bestB = b;
-          }
+          if (d < bestD) { bestD = d; bestA = a; bestB = b; }
         }
       }
       connected.add(bestB);
@@ -884,8 +1340,7 @@
 
     const corridorTiles = [];
     const carveCorridor = (rA, rB) => {
-      let x = rA.cx;
-      let y = rA.cy;
+      let x = rA.cx, y = rA.cy;
       const horizFirst = rng() > 0.5;
       const stepTile = (tx, ty) => {
         for (let oy = 0; oy <= 1; oy++) {
@@ -900,7 +1355,6 @@
           }
         }
       };
-
       if (horizFirst) {
         while (x !== rB.cx) { stepTile(x, y); x += Math.sign(rB.cx - x); }
         while (y !== rB.cy) { stepTile(x, y); y += Math.sign(rB.cy - y); }
@@ -910,12 +1364,9 @@
       }
       stepTile(rB.cx, rB.cy);
     };
+    for (const [a, b] of edges) carveCorridor(state.rooms[a], state.rooms[b]);
 
-    for (const [a, b] of edges) {
-      carveCorridor(state.rooms[a], state.rooms[b]);
-    }
-
-    // 3. Wrap all walkable tiles with STONE WALL borders
+    // 3. Wrap walkable tiles with STONE WALL borders
     for (let y = 1; y < MAP_H - 1; y++) {
       for (let x = 1; x < MAP_W - 1; x++) {
         if (state.grid[y][x] !== TILE.VOID) continue;
@@ -923,44 +1374,32 @@
         for (let dy = -1; dy <= 1 && !touchesFloor; dy++) {
           for (let dx = -1; dx <= 1; dx++) {
             const t = state.grid[y + dy][x + dx];
-            if (t === TILE.FLOOR || t === TILE.SANCTUM || t === TILE.BOSS_FLOOR) {
-              touchesFloor = true;
-              break;
-            }
+            if (t === TILE.FLOOR || t === TILE.SANCTUM || t === TILE.BOSS_FLOOR) { touchesFloor = true; break; }
           }
         }
         if (touchesFloor) state.grid[y][x] = TILE.WALL;
       }
     }
 
-    // 4. Identify Spawn Sanctum (Room 0) and Boss Chamber (furthest from Room 0)
+    // 4. Spawn Sanctum & Boss Chamber
     const spawnRoom = state.rooms[0];
     let bossRoom = state.rooms[state.rooms.length - 1];
     let maxRoomDist = -1;
     for (let i = 1; i < state.rooms.length; i++) {
       const r = state.rooms[i];
       const d = dist(spawnRoom.cx, spawnRoom.cy, r.cx, r.cy);
-      if (d > maxRoomDist) {
-        maxRoomDist = d;
-        bossRoom = r;
-      }
+      if (d > maxRoomDist) { maxRoomDist = d; bossRoom = r; }
     }
-
     for (let y = spawnRoom.y; y < spawnRoom.y + spawnRoom.h; y++) {
-      for (let x = spawnRoom.x; x < spawnRoom.x + spawnRoom.w; x++) {
-        state.grid[y][x] = TILE.SANCTUM;
-      }
+      for (let x = spawnRoom.x; x < spawnRoom.x + spawnRoom.w; x++) state.grid[y][x] = TILE.SANCTUM;
     }
     for (let y = bossRoom.y; y < bossRoom.y + bossRoom.h; y++) {
-      for (let x = bossRoom.x; x < bossRoom.x + bossRoom.w; x++) {
-        state.grid[y][x] = TILE.BOSS_FLOOR;
-      }
+      for (let x = bossRoom.x; x < bossRoom.x + bossRoom.w; x++) state.grid[y][x] = TILE.BOSS_FLOOR;
     }
 
     state.waypoint = { x: spawnRoom.cx + 0.5, y: spawnRoom.cy + 0.5 };
     state.stairs = { x: bossRoom.cx + 0.5, y: bossRoom.cy + 0.5, unlocked: false };
 
-    // Spawn player adjacent to Waypoint
     state.player.x = spawnRoom.cx - 0.8;
     state.player.y = spawnRoom.cy + 0.8;
     state.player.vx = 0;
@@ -972,24 +1411,52 @@
     state.camera.x = camIso.x;
     state.camera.y = camIso.y;
 
-    // 5. Place Iron Gates in narrow corridor pinch points
+    // 5. Iron Gates (some Lever-Locked!) & Color-Coded Rune Plates + Bridges
     for (let i = 0; i < corridorTiles.length && state.gates.length < 4; i += 7) {
       const ct = corridorTiles[i];
       if (dist(ct.x, ct.y, state.waypoint.x, state.waypoint.y) < 5) continue;
       const horizPinch = state.grid[ct.y - 1]?.[ct.x] === TILE.WALL && state.grid[ct.y + 1]?.[ct.x] === TILE.WALL;
       const vertPinch = state.grid[ct.y]?.[ct.x - 1] === TILE.WALL && state.grid[ct.y]?.[ct.x + 1] === TILE.WALL;
       if ((horizPinch || vertPinch) && state.gates.every((g) => dist(g.x, g.y, ct.x + 0.5, ct.y + 0.5) > 5)) {
-        state.gates.push({
-          x: ct.x + 0.5,
-          y: ct.y + 0.5,
-          axis: horizPinch ? 'v' : 'h',
-          open: 0,
-          isOpen: false
-        });
+        const isLocked = state.gates.length === 1;
+        state.gates.push({ x: ct.x + 0.5, y: ct.y + 0.5, axis: horizPinch ? 'v' : 'h', open: 0, isOpen: false, locked: isLocked });
+        if (isLocked && state.rooms.length > 2) {
+          const lr = state.rooms[1];
+          state.levers.push({ x: lr.cx + 0.8, y: lr.cy - 0.8, pulled: false, gateIdx: state.gates.length - 1 });
+        }
       }
     }
 
-    // 6. Place Flickering Wall Torches along chamber borders
+    // Color-coded Rune Plates & Teleportation Mirror Pads
+    const runeColors = [
+      { id: 'crimson', color: '#ef4444', label: 'Crimson' },
+      { id: 'azure',   color: '#3b82f6', label: 'Azure' },
+      { id: 'emerald', color: '#10b981', label: 'Emerald' }
+    ];
+    if (state.rooms.length >= 4) {
+      for (let i = 0; i < Math.min(2, state.rooms.length - 2); i++) {
+        const rm = state.rooms[i + 1];
+        const rc = runeColors[i % runeColors.length];
+        state.runePlates.push({ x: rm.x + 1.4, y: rm.y + 1.4, colorId: rc.id, color: rc.color, active: false });
+        state.runeBridges.push({ x: rm.cx + 0.5, y: rm.cy + 0.5, colorId: rc.id, color: rc.color, unlocked: false });
+      }
+      const mA = state.rooms[1];
+      const mB = state.rooms[Math.max(2, state.rooms.length - 2)];
+      state.mirrorPads.push({ id: 'm1', x: mA.x + mA.w - 1.2, y: mA.y + 1.2, tx: mB.x + 1.2, ty: mB.y + mB.h - 1.2, cd: 0 });
+      state.mirrorPads.push({ id: 'm2', x: mB.x + 1.2, y: mB.y + mB.h - 1.2, tx: mA.x + mA.w - 1.2, ty: mA.y + 1.2, cd: 0 });
+    }
+
+    // Destructible Cracked Illusion Walls hiding secret treasure caches
+    if (state.rooms.length >= 3) {
+      const sr = state.rooms[Math.min(2, state.rooms.length - 2)];
+      const wx = sr.x + sr.w;
+      const wy = sr.cy;
+      if (wx < MAP_W - 3 && state.grid[wy]?.[wx] === TILE.WALL) {
+        state.secretWalls.push({ x: wx + 0.5, y: wy + 0.5, gx: wx, gy: wy, broken: false });
+      }
+    }
+
+    // 6. Wall Torches / Relightable Braziers & Props / Explosive Oil Barrels
     for (const r of state.rooms) {
       const corners = [
         { x: r.x + 0.5, y: r.y + 0.5 },
@@ -999,18 +1466,9 @@
       ];
       for (const c of corners) {
         if (rng() > 0.25) {
-          state.torches.push({
-            x: c.x,
-            y: c.y,
-            phase: rng() * Math.PI * 2,
-            isArcane: r === spawnRoom
-          });
+          state.torches.push({ x: c.x, y: c.y, phase: rng() * Math.PI * 2, isArcane: r === spawnRoom, lit: true });
         }
       }
-    }
-
-    // 7. Place Destructible Urns & Barrels
-    for (const r of state.rooms) {
       const propCount = randInt(rng, 2, 4);
       for (let i = 0; i < propCount; i++) {
         const px = r.x + 0.7 + rng() * Math.max(1, r.w - 1.4);
@@ -1018,66 +1476,103 @@
         if (dist(px, py, state.waypoint.x, state.waypoint.y) < 1.8) continue;
         if (dist(px, py, state.stairs.x, state.stairs.y) < 1.8) continue;
         if (dist(px, py, state.player.x, state.player.y) < 1.5) continue;
-        state.props.push({
-          x: px,
-          y: py,
-          kind: rng() > 0.45 ? 'urn' : 'barrel',
-          hp: 1,
-          broken: false
-        });
+        const kind = rng() > 0.68 ? 'oil_barrel' : rng() > 0.4 ? 'urn' : 'barrel';
+        state.props.push({ x: px, y: py, kind, hp: 1, broken: false });
       }
     }
 
-    // 8. Spawn Dungeon Monsters (Skeletal Warriors, Champion Ghouls with Affixes, Boss / Floor Guardian)
-    const floorMult = 1 + (state.floor - 1) * 0.28;
-    const isMilestone = state.floor % 3 === 0;
+    // 7. Universal Traps (Floor Spike Plates & Poison Dart Walls) & Interactive Room Events
+    for (let i = 1; i < state.rooms.length; i++) {
+      const r = state.rooms[i];
+      if (r === bossRoom) continue;
+      if (rng() < 0.65) {
+        state.traps.push({
+          kind: rng() < 0.6 ? 'spikes' : 'darts',
+          x: r.cx + (rng() - 0.5) * 2.0,
+          y: r.cy + (rng() - 0.5) * 2.0,
+          timer: rng() * 2.5,
+          active: false
+        });
+      }
+      if (i === 1 && state.rooms.length > 3) {
+        state.events.push({ kind: 'shrine', x: r.cx, y: r.cy + 0.9, used: false, label: 'Dungeon Shrine' });
+      } else if (i === 2 && state.rooms.length > 4) {
+        state.events.push({ kind: 'cursed_chest', x: r.cx, y: r.cy, used: false, label: 'Cursed Chest' });
+      } else if (i === 3 && state.rooms.length > 5) {
+        state.events.push({ kind: 'obelisk', x: r.cx, y: r.cy, used: false, active: false, timer: 20, wave: 0, label: 'Blood Obelisk' });
+      } else if (i === 4 && state.rooms.length > 6) {
+        state.events.push({ kind: 'invasion', x: r.cx, y: r.cy, used: false, shards: 3, label: 'Invasion Altar' });
+      } else if (i === 5 && state.rooms.length > 7) {
+        state.events.push({ kind: 'peddler', x: r.cx, y: r.cy, used: false, label: 'Goblin Peddler' });
+      }
+    }
+
+    // 8. Spawn Dungeon Monsters (including Treasure Goblin & Boss / Floor Guardian)
+    const riftScale = state.riftTier > 0 ? (1 + state.riftTier * 0.35) : 1;
+    const floorMult = (1 + (state.floor - 1) * 0.28) * riftScale;
+    const isMilestone = state.floor % 3 === 0 || state.riftTier > 0;
     for (const r of state.rooms) {
       if (r === spawnRoom) continue;
-
       if (r === bossRoom) {
         const boss = createMonster('boss', bossRoom.cx + 0.2, bossRoom.cy - 0.9, floorMult, isMilestone, rng);
         state.monsters.push(boss);
-        // Two skeletal honor guards
         state.monsters.push(createMonster('skeleton', bossRoom.x + 1.2, bossRoom.y + 1.2, floorMult, false, rng));
         state.monsters.push(createMonster('skeleton', bossRoom.x + bossRoom.w - 1.2, bossRoom.y + bossRoom.h - 1.2, floorMult, false, rng));
         continue;
       }
-
       const skelCount = randInt(rng, 2, 4);
       for (let i = 0; i < skelCount; i++) {
         const mx = r.x + 1 + rng() * Math.max(1, r.w - 2);
         const my = r.y + 1 + rng() * Math.max(1, r.h - 2);
         state.monsters.push(createMonster('skeleton', mx, my, floorMult, false, rng));
       }
-
       if (rng() > 0.35 || r.id % 2 === 1) {
-        const gx = r.cx + (rng() - 0.5) * 1.6;
-        const gy = r.cy + (rng() - 0.5) * 1.6;
-        state.monsters.push(createMonster('ghoul', gx, gy, floorMult, false, rng));
+        state.monsters.push(createMonster('ghoul', r.cx + (rng() - 0.5) * 1.4, r.cy + (rng() - 0.5) * 1.4, floorMult, false, rng));
+      }
+      if (r.id === 2 && rng() < 0.75) {
+        state.monsters.push(createMonster('goblin', r.cx, r.cy + 0.6, floorMult, false, rng));
       }
     }
 
     state.mode = 'DUNGEON';
     state.townNpcs = [];
-    state.poisonClouds = [];
     state.waypointArmed = false;
     state.lastFogTileX = -999;
     state.lastFogTileY = -999;
+    spawnCompanionPet();
     updateFogOfWar(true);
     updateHud(true);
-    showToast(isMilestone ? `Floor ${state.floor} • Guardian Lair (#${state.seed})` : `Floor ${state.floor} • Crypt (#${state.seed})`);
+    const biomeName = BIOMES[state.biome]?.name || 'Crypt';
+    showToast(state.riftTier > 0 ? `Abyssal Rift T${state.riftTier} • ${biomeName}` : `Floor ${state.floor} • ${biomeName}`);
   }
 
   function generateTown() {
     state.mode = 'TOWN';
+    MAP_W = 42;
+    MAP_H = 42;
+    ensureMapCanvases();
+    state.biome = 'crypt';
+    state.floorCondition = 'calm';
+    state.riftTier = 0;
+    state.riftTimer = 0;
     state.grid = Array.from({ length: MAP_H }, () => new Uint8Array(MAP_W));
     state.tileVariant = Array.from({ length: MAP_H }, () => new Uint8Array(MAP_W));
     state.explored = Array.from({ length: MAP_H }, () => new Uint8Array(MAP_W));
     state.rooms = [];
     state.torches = [];
     state.gates = [];
+    state.levers = [];
+    state.runePlates = [];
+    state.runeBridges = [];
+    state.mirrorPads = [];
+    state.secretWalls = [];
+    state.traps = [];
+    state.events = [];
+    state.crystals = [];
+    state.bossTelegraphs = [];
     state.props = [];
     state.monsters = [];
+    state.minions = [];
     state.lootDrops = [];
     state.projectiles = [];
     state.poisonClouds = [];
@@ -1092,9 +1587,8 @@
     for (let y = minY; y <= maxY; y++) {
       for (let x = minX; x <= maxX; x++) {
         const isBorder = x === minX || x === maxX || y === minY || y === maxY;
-        if (isBorder) {
-          state.grid[y][x] = TILE.WALL;
-        } else {
+        if (isBorder) state.grid[y][x] = TILE.WALL;
+        else {
           const inPlaza = x >= 18 && x <= 23 && y >= 18 && y <= 23;
           state.grid[y][x] = inPlaza ? TILE.SANCTUM : TILE.FLOOR;
           state.tileVariant[y][x] = (x + y) % 3;
@@ -1114,7 +1608,6 @@
     state.camera.x = camIso.x;
     state.camera.y = camIso.y;
 
-    // Warm Town Lanterns & Central Campfire Glow
     const lanternCoords = [
       { x: 13.5, y: 13.5 }, { x: 27.5, y: 13.5 },
       { x: 13.5, y: 27.5 }, { x: 27.5, y: 27.5 },
@@ -1122,20 +1615,23 @@
       { x: 18.2, y: 22.8 }, { x: 22.8, y: 22.8 }
     ];
     for (let i = 0; i < lanternCoords.length; i++) {
-      state.torches.push({ x: lanternCoords[i].x, y: lanternCoords[i].y, phase: i * 0.9, isArcane: false });
+      state.torches.push({ x: lanternCoords[i].x, y: lanternCoords[i].y, phase: i * 0.9, isArcane: false, lit: true });
     }
-    state.torches.push({ x: 20.5, y: 20.5, phase: 0.4, isArcane: true });
+    state.torches.push({ x: 20.5, y: 20.5, phase: 0.4, isArcane: true, lit: true });
 
     state.townNpcs = [
-      { id: 'blacksmith', label: 'Blacksmith Forge', short: 'FORGE', x: 15.5, y: 16.5, color: '#f97316' },
-      { id: 'stash',      label: 'Hero Stash',       short: 'STASH', x: 25.5, y: 16.5, color: '#facc15' },
-      { id: 'apothecary', label: 'Apothecary',       short: 'HEALER',x: 15.5, y: 25.5, color: '#4ade80' },
-      { id: 'waypoint',   label: 'Waypoint Portal',  short: 'PORTAL',x: 20.5, y: 20.5, color: '#60a5fa' }
+      { id: 'blacksmith', label: 'Blacksmith Forge', short: 'FORGE',   x: 15.5, y: 16.5, color: '#f97316' },
+      { id: 'stash',      label: 'Hero Stash',       short: 'STASH',   x: 25.5, y: 16.5, color: '#facc15' },
+      { id: 'apothecary', label: 'Alchemist',        short: 'ALCHEMY', x: 15.5, y: 25.5, color: '#4ade80' },
+      { id: 'bounties',   label: 'Bounty Board',     short: 'BOUNTY',  x: 25.5, y: 25.5, color: '#fbbf24' },
+      { id: 'pets',       label: 'Pet Sanctuary',    short: 'PETS',    x: 20.5, y: 14.5, color: '#f43f5e' },
+      { id: 'waypoint',   label: 'Waypoint Portal',  short: 'PORTAL',  x: 20.5, y: 20.5, color: '#60a5fa' }
     ];
 
     state.fogDirty = true;
     state.lastFogTileX = Math.floor(state.player.x);
     state.lastFogTileY = Math.floor(state.player.y);
+    spawnCompanionPet();
     refreshBlacksmithStock();
     updateHud(true);
     showToast('Shadowhaven Sanctuary — Vitals Restored');
@@ -1143,47 +1639,16 @@
 
   function createMonster(type, x, y, floorMult, isGuardian = false, rng = Math.random) {
     const specs = {
-      skeleton: {
-        name: 'Skeletal Warrior',
-        maxHp: Math.round(48 * floorMult),
-        atk: Math.round(9 * floorMult),
-        speed: 2.35,
-        range: 1.05,
-        aggro: 7.5,
-        cd: 1.15,
-        xp: Math.round(28 * floorMult),
-        radius: 0.34,
-        tier: 'normal'
-      },
-      ghoul: {
-        name: 'Champion Ghoul',
-        maxHp: Math.round(105 * floorMult),
-        atk: Math.round(15 * floorMult),
-        speed: 2.95,
-        range: 1.15,
-        aggro: 8.5,
-        cd: 0.95,
-        xp: Math.round(68 * floorMult),
-        radius: 0.38,
-        tier: 'elite'
-      },
-      boss: {
-        name: 'Horned Demon Brute',
-        maxHp: Math.round(320 * floorMult),
-        atk: Math.round(24 * floorMult),
-        speed: 2.1,
-        range: 1.45,
-        aggro: 9.5,
-        cd: 1.45,
-        xp: Math.round(240 * floorMult),
-        radius: 0.52,
-        tier: 'boss'
-      }
+      skeleton: { name: 'Skeletal Warrior', maxHp: Math.round(48 * floorMult),  atk: Math.round(9 * floorMult),  speed: 2.35, range: 1.05, aggro: 7.5, cd: 1.15, xp: Math.round(28 * floorMult),  radius: 0.34, tier: 'normal' },
+      ghoul:    { name: 'Champion Ghoul',   maxHp: Math.round(105 * floorMult), atk: Math.round(15 * floorMult), speed: 2.95, range: 1.15, aggro: 8.5, cd: 0.95, xp: Math.round(68 * floorMult),  radius: 0.38, tier: 'elite' },
+      goblin:   { name: 'Treasure Goblin',  maxHp: Math.round(80 * floorMult),  atk: 0,                          speed: 4.35, range: 0.8,  aggro: 7.5, cd: 2.0,  xp: Math.round(90 * floorMult),  radius: 0.32, tier: 'goblin' },
+      rival:    { name: 'Shadow Rival',     maxHp: Math.round(190 * floorMult), atk: Math.round(19 * floorMult), speed: 3.4,  range: 1.25, aggro: 11,  cd: 0.85, xp: Math.round(140 * floorMult), radius: 0.4,  tier: 'elite' },
+      boss:     { name: 'Horned Demon Brute',maxHp: Math.round(340 * floorMult),atk: Math.round(24 * floorMult), speed: 2.1,  range: 1.45, aggro: 9.5, cd: 1.45, xp: Math.round(240 * floorMult), radius: 0.52, tier: 'boss' }
     };
-    const s = specs[type];
+    const s = specs[type] || specs.skeleton;
     const affixKeys = Object.keys(ELITE_AFFIXES);
     const affixes = [];
-    if (type === 'ghoul') {
+    if (type === 'ghoul' || type === 'rival') {
       affixes.push(affixKeys[Math.floor(rng() * affixKeys.length)]);
     } else if (type === 'boss') {
       const count = isGuardian ? 2 : 1;
@@ -1193,51 +1658,27 @@
       }
     }
 
-    let name = s.name;
-    let maxHp = s.maxHp;
-    let speed = s.speed;
-    let cd = s.cd;
-    let xp = s.xp;
+    let name = s.name, maxHp = s.maxHp, speed = s.speed, cd = s.cd, xp = s.xp;
     if (isGuardian && type === 'boss') {
-      const gIdx = Math.floor((state.floor / 3 - 1) % FLOOR_GUARDIANS.length);
-      name = FLOOR_GUARDIANS[Math.max(0, gIdx)];
-      maxHp = Math.round(maxHp * 1.35);
+      const gIdx = Math.floor((Math.max(1, state.floor) / 3) % FLOOR_GUARDIANS.length);
+      name = FLOOR_GUARDIANS[gIdx];
+      maxHp = Math.round(maxHp * 1.45);
       xp = Math.round(xp * 1.6);
     }
-    if (affixes.includes('fast')) {
-      speed *= 1.35;
-      cd *= 0.78;
-    }
+    if (affixes.includes('fast')) { speed *= 1.35; cd *= 0.78; }
 
     return {
       id: Math.random().toString(36).slice(2, 9),
-      type,
-      name,
-      affixes,
+      type, name, affixes,
       isGuardian: Boolean(isGuardian && type === 'boss'),
-      x,
-      y,
-      hp: maxHp,
-      maxHp,
-      atk: s.atk,
-      speed,
-      range: s.range,
-      aggro: s.aggro,
-      atkCdMax: cd,
-      atkCd: 0.3,
-      xp,
-      radius: s.radius,
-      tier: s.tier,
-      facingX: 0,
-      facingY: 1,
-      walkPhase: rng() * Math.PI * 2,
-      hitFlash: 0,
-      stunTimer: 0,
-      windupTimer: 0,
-      slamTelegraph: 0,
-      vx: 0,
-      vy: 0,
-      engaged: false
+      x, y, hp: maxHp, maxHp, atk: s.atk, speed, range: s.range, aggro: s.aggro,
+      atkCdMax: cd, atkCd: 0.3, xp, radius: s.radius, tier: s.tier,
+      facingX: 0, facingY: 1, walkPhase: rng() * Math.PI * 2,
+      hitFlash: 0, stunTimer: 0, windupTimer: 0, slamTelegraph: 0,
+      stagger: 0, maxStagger: type === 'boss' ? 100 : 0, staggeredTimer: 0,
+      phase: 1, bossComboStep: 0, bossCastCd: 2.2,
+      statuses: { burn: 0, chill: 0, chillStacks: 0, bleed: 0, poison: 0 },
+      vx: 0, vy: 0, engaged: false
     };
   }
 
@@ -1359,61 +1800,66 @@
   // LOOT GENERATION & PICKUP
   // =========================================================================
   const ITEM_NAMES = {
-    weapon: {
-      magic: ['Rune-Etched Gladius', 'Cryptsteel Saber', 'Sanctified Edge'],
-      rare: ['Sunfire Claymore', 'Soulreaver Blade', 'Oathkeeper Greatsword'],
-      legendary: ['Dawnbreaker Executioner', 'Ashen Verdict']
-    },
-    helm: {
-      magic: ['Ironwarden Visor', 'Vigilant Greathelm', 'Ashbone Crown'],
-      rare: ['Seraphic Sallet', 'Dreadplate Bascinet', 'Cryptlord Casque'],
-      legendary: ['Crown of the Undying Sun', 'Obsidian Halo']
-    },
-    armor: {
-      magic: ['Tempered Brigandine', 'Gloomplate Mail', 'Warded Hauberk'],
-      rare: ['Cathedral Aegis', 'Bloodforged Cuirass', 'Sentinel Plate'],
-      legendary: ['Archangel Bastion', 'Shroud of St. Valen']
-    },
-    ring: {
-      magic: ['Silver Signet', 'Sapphire Band', 'Oath Ring'],
-      rare: ['Crimson Seal', 'Wraithbone Loop', 'Sunstone Band'],
-      legendary: ['Sovereign Signet of Light', 'Hellfire Coil']
-    }
+    weapon:  { magic: ['Rune-Etched Gladius', 'Yew Longbow', 'Bonechannel Wand'], rare: ['Sunfire Claymore', 'Hawkeye Repeater', 'Soulreaver Staff'], legendary: ['Dawnbreaker Executioner', 'Ashen Verdict'], set: ['Cryptguard Cleaver', 'Nightstalker Bow', 'Soulbinder Scythe'] },
+    offhand: { magic: ['Iron Buckler', 'Leather Quiver', 'Runed Skull'], rare: ['Aegis Shield', 'Serrated Quiver', 'Abyssal Focus'], legendary: ['Bulwark of St. Valen', 'Tome of Eternal Night'], set: ['Cryptguard Tower', 'Nightstalker Quiver', 'Soulbinder Grimoire'] },
+    helm:    { magic: ['Ironwarden Visor', 'Ranger Hood', 'Bone Circlet'], rare: ['Seraphic Sallet', 'Shadow Cowl', 'Cryptlord Casque'], legendary: ['Crown of the Undying Sun', 'Obsidian Halo'], set: ['Cryptguard Helm', 'Nightstalker Mask', 'Soulbinder Crown'] },
+    armor:   { magic: ['Tempered Brigandine', 'Scout Jerkin', 'Warded Vestment'], rare: ['Cathedral Aegis', 'Bloodforged Cuirass', 'Sentinel Plate'], legendary: ['Archangel Bastion', 'Shroud of St. Valen'], set: ['Cryptguard Plate', 'Nightstalker Coat', 'Soulbinder Robes'] },
+    boots:   { magic: ['Ironshod Treads', 'Swift Striders', 'Ash Walkers'], rare: ['Gale Sabatons', 'Shadowstep Boots', 'Gravewarden Greaves'], legendary: ['Phantom Stride', 'Hellfire Treads'], set: ['Cryptguard Sabatons', 'Nightstalker Boots', 'Soulbinder Slippers'] },
+    ring:    { magic: ['Silver Signet', 'Sapphire Band', 'Oath Ring'], rare: ['Crimson Seal', 'Wraithbone Loop', 'Sunstone Band'], legendary: ['Sovereign Signet of Light', 'Hellfire Coil'], set: ['Cryptguard Signet', 'Nightstalker Loop', 'Soulbinder Band'] },
+    amulet:  { magic: ['Bone Pendant', 'Amber Talisman', 'Iron Locket'], rare: ['Bloodstone Choker', 'Moonlight Charm', 'Dread Amulet'], legendary: ['Heart of Shadowhaven', 'Tear of the Abyss'], set: ['Cryptguard Gorget', 'Nightstalker Charm', 'Soulbinder Relic'] }
   };
 
-  function generateItem(rarity) {
-    const slot = SLOTS[Math.floor(Math.random() * SLOTS.length)];
-    const names = ITEM_NAMES[slot][rarity] || ITEM_NAMES[slot].magic;
-    const name = names[Math.floor(Math.random() * names.length)];
-    const scale = 1 + (state.floor - 1) * 0.26;
-    const mult = rarity === 'legendary' ? 2.2 : rarity === 'rare' ? 1.55 : 1.1;
+  function generateItem(rarity, forcedSlot = null) {
+    const slot = forcedSlot || SLOTS[Math.floor(Math.random() * SLOTS.length)];
+    const names = ITEM_NAMES[slot]?.[rarity] || ITEM_NAMES[slot].magic;
+    const nameIdx = Math.floor(Math.random() * names.length);
+    const name = names[nameIdx];
+    const scale = 1 + (state.floor - 1) * 0.26 + (state.riftTier || 0) * 0.22;
+    const mult = rarity === 'legendary' ? 2.2 : rarity === 'set' ? 1.85 : rarity === 'rare' ? 1.55 : rarity === 'magic' ? 1.12 : 0.85;
 
     const stats = {};
+    let weaponType = null;
     if (slot === 'weapon') {
+      const wKeys = Object.keys(WEAPON_TYPES);
+      weaponType = wKeys[Math.floor(Math.random() * wKeys.length)];
       stats.atk = Math.round((8 + Math.random() * 8) * scale * mult);
       stats.crit = Math.round((2 + Math.random() * 4) * mult * 10) / 10;
-      if (rarity !== 'magic') stats.loh = Math.round((2 + Math.random() * 4) * scale * mult);
-    } else if (slot === 'helm') {
-      stats.hp = Math.round((22 + Math.random() * 18) * scale * mult);
+      if (rarity !== 'magic' && rarity !== 'common') stats.loh = Math.round((2 + Math.random() * 4) * scale * mult);
+    } else if (slot === 'offhand') {
+      stats.atk = Math.round((4 + Math.random() * 5) * scale * mult);
       stats.arm = Math.round((3 + Math.random() * 4) * scale * mult);
-      if (rarity !== 'magic') stats.crit = Math.round((1.5 + Math.random() * 3) * mult * 10) / 10;
-    } else if (slot === 'armor') {
-      stats.hp = Math.round((32 + Math.random() * 24) * scale * mult);
-      stats.arm = Math.round((6 + Math.random() * 6) * scale * mult);
-      if (rarity === 'legendary') stats.loh = Math.round((4 + Math.random() * 4) * scale);
+      stats.hp = Math.round((14 + Math.random() * 14) * scale * mult);
+    } else if (slot === 'helm' || slot === 'armor') {
+      stats.hp = Math.round((24 + Math.random() * 20) * scale * mult);
+      stats.arm = Math.round((4 + Math.random() * 5) * scale * mult);
+      if (rarity === 'legendary' || rarity === 'set') stats.loh = Math.round((3 + Math.random() * 4) * scale);
+    } else if (slot === 'boots') {
+      stats.arm = Math.round((2 + Math.random() * 4) * scale * mult);
+      stats.spd = Math.round((4 + Math.random() * 5) * mult);
+      stats.hp = Math.round((12 + Math.random() * 12) * scale * mult);
     } else {
       stats.atk = Math.round((4 + Math.random() * 6) * scale * mult);
-      stats.crit = Math.round((3 + Math.random() * 5) * mult * 10) / 10;
+      stats.crit = Math.round((2.5 + Math.random() * 4.5) * mult * 10) / 10;
       if (rarity !== 'magic') stats.loh = Math.round((3 + Math.random() * 4) * scale * mult);
     }
 
+    const canSocket = slot === 'weapon' || slot === 'helm' || slot === 'armor';
+    const sockets = canSocket && rarity !== 'common' ? (rarity === 'legendary' || rarity === 'set' || Math.random() < 0.35 ? 2 : 1) : 0;
+    const setIds = Object.keys(SET_DEFS);
+    const setId = rarity === 'set' ? setIds[nameIdx % setIds.length] : null;
+
     return {
       id: 'itm_' + Math.random().toString(36).slice(2, 10),
-      name,
-      slot,
-      rarity,
-      stats
+      name, slot, weaponType, rarity, setId, stats,
+      sockets, gems: []
     };
+  }
+
+  function generateGem(gemId = null) {
+    const keys = Object.keys(GEM_DEFS);
+    const k = gemId || keys[Math.floor(Math.random() * keys.length)];
+    const def = GEM_DEFS[k];
+    return { id: 'gem_' + Math.random().toString(36).slice(2, 9), kind: 'gem', gemId: k, name: `${def.name} Gem`, rarity: 'rare', desc: def.desc };
   }
 
   function spawnLootDrop(wx, wy, sourceTier = 'normal') {
@@ -1426,57 +1872,42 @@
     const destY = isPositionClear(tx, ty, 0.25) ? ty : wy;
 
     const pushDrop = (drop) => {
-      state.lootDrops.push(Object.assign({
-        x: wx,
-        y: wy,
-        destX,
-        destY,
-        z: 18,
-        vz: 95,
-        age: 0,
-        screenRect: null
-      }, drop));
+      state.lootDrops.push(Object.assign({ x: wx, y: wy, destX, destY, z: 18, vz: 95, age: 0, screenRect: null }, drop));
     };
 
+    const goldMult = getHeroStats().goldBonus;
     if (sourceTier === 'guardian') {
-      const goldMult = getHeroStats().goldBonus;
-      pushDrop({ kind: 'gold', amount: Math.round((85 + Math.random() * 45) * state.floor * goldMult), label: 'Guardian Chest' });
+      pushDrop({ kind: 'gold', amount: Math.round((95 + Math.random() * 50) * state.floor * goldMult), label: 'Guardian Chest' });
       pushDrop({ kind: 'potion', amount: 2, label: 'Crimson Vials' });
-      const leg = generateItem('legendary');
-      pushDrop({ kind: 'gear', item: leg, rarity: 'legendary', label: leg.name });
-      const rareItem = generateItem('rare');
-      pushDrop({ kind: 'gear', item: rareItem, rarity: 'rare', label: rareItem.name, destX: wx + 0.5, destY: wy - 0.35 });
+      pushDrop({ kind: 'essence', amount: 3, label: '3 Monster Essence' });
+      const leg = generateItem(Math.random() < 0.35 ? 'set' : 'legendary');
+      pushDrop({ kind: 'gear', item: leg, rarity: leg.rarity, label: leg.name });
+      const gem = generateGem();
+      pushDrop({ kind: 'gem', item: gem, rarity: 'rare', label: gem.name, destX: wx + 0.5, destY: wy - 0.35 });
       sfx.legendary();
       return;
     }
 
-    if (sourceTier === 'boss') {
-      const goldMult = getHeroStats().goldBonus;
-      pushDrop({ kind: 'gold', amount: Math.round((45 + Math.random() * 35) * state.floor * goldMult), label: 'Boss Hoard' });
-      pushDrop({ kind: 'potion', amount: 1, label: 'Crimson Vial' });
-      const gearRarity = Math.random() < 0.45 ? 'legendary' : 'rare';
+    if (sourceTier === 'boss' || sourceTier === 'goblin') {
+      pushDrop({ kind: 'gold', amount: Math.round((55 + Math.random() * 40) * state.floor * goldMult), label: sourceTier === 'goblin' ? 'Goblin Hoard' : 'Boss Hoard' });
+      pushDrop({ kind: 'essence', amount: 2, label: '2 Monster Essence' });
+      const rRoll = Math.random();
+      const gearRarity = rRoll < 0.32 ? 'legendary' : rRoll < 0.55 ? 'set' : 'rare';
       const item = generateItem(gearRarity);
       pushDrop({ kind: 'gear', item, rarity: gearRarity, label: item.name });
-      if (gearRarity === 'legendary') sfx.legendary();
-      const bonus = generateItem(Math.random() < 0.5 ? 'rare' : 'magic');
-      pushDrop({
-        kind: 'gear',
-        item: bonus,
-        rarity: bonus.rarity,
-        label: bonus.name,
-        destX: wx + 0.4,
-        destY: wy - 0.3
-      });
+      if (gearRarity === 'legendary' || gearRarity === 'set') sfx.legendary();
+      const gem = generateGem();
+      pushDrop({ kind: 'gem', item: gem, rarity: 'rare', label: gem.name, destX: wx + 0.4, destY: wy - 0.3 });
       return;
     }
 
-    const goldMult = getHeroStats().goldBonus;
     if (sourceTier === 'elite') {
-      pushDrop({ kind: 'gold', amount: Math.round((18 + Math.random() * 18) * state.floor * goldMult), label: 'Gold Coins' });
-      const rarity = roll < 0.18 ? 'legendary' : roll < 0.55 ? 'rare' : 'magic';
+      pushDrop({ kind: 'gold', amount: Math.round((20 + Math.random() * 20) * state.floor * goldMult), label: 'Gold Coins' });
+      if (Math.random() < 0.4) pushDrop({ kind: 'essence', amount: 1, label: 'Monster Essence' });
+      const rarity = roll < 0.14 ? 'legendary' : roll < 0.28 ? 'set' : roll < 0.62 ? 'rare' : 'magic';
       const item = generateItem(rarity);
       pushDrop({ kind: 'gear', item, rarity, label: item.name });
-      if (rarity === 'legendary') sfx.legendary();
+      if (rarity === 'legendary' || rarity === 'set') sfx.legendary();
       return;
     }
 
@@ -1487,30 +1918,32 @@
       } else if (roll < 0.78) {
         pushDrop({ kind: 'potion', amount: 1, label: 'Health Potion' });
       } else {
-        const rarity = Math.random() < 0.2 ? 'rare' : 'magic';
+        const rarity = Math.random() < 0.25 ? 'rare' : 'magic';
         const item = generateItem(rarity);
         pushDrop({ kind: 'gear', item, rarity, label: item.name });
       }
       return;
     }
 
-    // Normal skeleton drop
     if (roll < 0.45) {
       const amt = Math.round((8 + Math.random() * 14) * state.floor * goldMult);
       pushDrop({ kind: 'gold', amount: amt, label: `${amt} Gold` });
-    } else if (roll < 0.58) {
+    } else if (roll < 0.57) {
       pushDrop({ kind: 'potion', amount: 1, label: 'Health Potion' });
+    } else if (roll < 0.63) {
+      const gem = generateGem();
+      pushDrop({ kind: 'gem', item: gem, rarity: 'rare', label: gem.name });
     } else if (roll < 0.88) {
-      const rarity = roll > 0.84 ? 'legendary' : roll > 0.74 ? 'rare' : 'magic';
+      const rarity = roll > 0.85 ? 'legendary' : roll > 0.81 ? 'set' : roll > 0.72 ? 'rare' : 'magic';
       const item = generateItem(rarity);
       pushDrop({ kind: 'gear', item, rarity, label: item.name });
-      if (rarity === 'legendary') sfx.legendary();
+      if (rarity === 'legendary' || rarity === 'set') sfx.legendary();
     }
   }
 
   function passesLootFilter(drop) {
     if (!drop || drop.kind !== 'gear') return true;
-    if (drop.rarity === 'legendary') return true;
+    if (drop.rarity === 'legendary' || drop.rarity === 'set') return true;
     if (state.lootFilter === 'rare') return drop.rarity === 'rare';
     if (state.lootFilter === 'magic') return drop.rarity === 'magic' || drop.rarity === 'rare';
     return true;
@@ -1541,16 +1974,26 @@
       return true;
     }
 
-    if (drop.kind === 'gear') {
+    if (drop.kind === 'essence') {
+      p.essence += drop.amount;
+      addFloatText(drop.x, drop.y, `+${drop.amount} Essence`, '#c084fc', false);
+      sfx.loot();
+      state.lootDrops.splice(dropIdx, 1);
+      updateHud();
+      saveProgress();
+      return true;
+    }
+
+    if (drop.kind === 'gear' || drop.kind === 'gem') {
       if (p.bag.length >= MAX_BAG_SLOTS) {
-        showToast('Satchel full! Salvage gear in Bag.');
+        showToast('Satchel full! Salvage gear in Bag or Forge.');
         return false;
       }
       p.bag.push(drop.item);
       const rColor = RARITY[drop.rarity]?.color || '#60a5fa';
-      addFloatText(drop.x, drop.y, drop.item.name, rColor, drop.rarity === 'legendary');
-      if (drop.rarity === 'legendary') {
-        showToast(`Legendary Found: ${drop.item.name}!`);
+      addFloatText(drop.x, drop.y, drop.item.name, rColor, drop.rarity === 'legendary' || drop.rarity === 'set');
+      if (drop.rarity === 'legendary' || drop.rarity === 'set') {
+        showToast(`${RARITY[drop.rarity].label} Found: ${drop.item.name}!`);
         sfx.legendary();
       } else {
         sfx.loot();
@@ -1564,38 +2007,17 @@
   }
 
   // =========================================================================
-  // COMBAT, SKILLS & PROGRESSION
+  // COMBAT, SKILLS, ULTIMATES, PETS, MINIONS & ELEMENTAL COMBOS
   // =========================================================================
   function addFloatText(wx, wy, text, color, isCrit = false) {
-    state.floatTexts.push({
-      x: wx,
-      y: wy,
-      z: 36,
-      vy: 38,
-      text,
-      color,
-      isCrit,
-      life: isCrit ? 1.05 : 0.78,
-      maxLife: isCrit ? 1.05 : 0.78
-    });
+    state.floatTexts.push({ x: wx, y: wy, z: 36, vy: 38, text, color, isCrit, life: isCrit ? 1.05 : 0.78, maxLife: isCrit ? 1.05 : 0.78 });
   }
 
   function spawnParticles(wx, wy, color, count = 8, speed = 2.4, zStart = 18) {
     for (let i = 0; i < count; i++) {
       const ang = Math.random() * Math.PI * 2;
       const sp = (0.4 + Math.random() * 0.8) * speed;
-      state.particles.push({
-        x: wx,
-        y: wy,
-        z: zStart,
-        vx: Math.cos(ang) * sp,
-        vy: Math.sin(ang) * sp,
-        vz: 30 + Math.random() * 55,
-        color,
-        size: 2.2 + Math.random() * 2.5,
-        life: 0.35 + Math.random() * 0.3,
-        maxLife: 0.65
-      });
+      state.particles.push({ x: wx, y: wy, z: zStart, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, vz: 30 + Math.random() * 55, color, size: 2.2 + Math.random() * 2.5, life: 0.35 + Math.random() * 0.3, maxLife: 0.65 });
     }
   }
 
@@ -1606,6 +2028,8 @@
       p.xp -= p.nextXp;
       p.level += 1;
       p.nextXp = Math.round(p.nextXp * 1.42);
+      p.skillPoints += 1;
+      if (p.level % 2 === 0) p.masteryPoints += 1;
       syncPlayerVitalsBounds();
       p.hp = p.maxHp;
       p.mp = p.maxMp;
@@ -1613,15 +2037,62 @@
       sfx.lvl();
       spawnParticles(p.x, p.y, '#facc15', 22, 3.6, 20);
       addFloatText(p.x, p.y, `LEVEL ${p.level}!`, '#fde047', true);
-      showToast(`Level ${p.level} Reached! Full Restore +1 Potion`);
+      showToast(`Level ${p.level}! +1 Skill Point${p.level % 2 === 0 ? ' +1 Mastery Point' : ''}`);
     }
     saveProgress();
   }
 
-  function damageMonster(m, rawDmg, knockDirX, knockDirY, canCrit = true) {
+  function advanceBounty(type, amt = 1) {
+    for (const b of state.account.bounties || []) {
+      if (!b.claimed && b.type === type && b.prog < b.target) {
+        b.prog = Math.min(b.target, b.prog + amt);
+        if (b.prog >= b.target) showToast(`Bounty Ready: ${b.title}!`);
+      }
+    }
+  }
+
+  function applyStatus(m, type, dur = 3.5) {
+    if (!m || !m.statuses) return;
+    if (type === 'chill') {
+      m.statuses.chill = Math.max(m.statuses.chill, dur);
+      m.statuses.chillStacks = Math.min(2, (m.statuses.chillStacks || 0) + 1);
+      if (m.statuses.chillStacks >= 2 && m.tier !== 'boss') {
+        m.stunTimer = Math.max(m.stunTimer, 1.4);
+        m.statuses.chillStacks = 0;
+        addFloatText(m.x, m.y, 'FROZEN!', '#38bdf8', false);
+      }
+    } else {
+      m.statuses[type] = Math.max(m.statuses[type] || 0, dur);
+    }
+
+    // Elemental Status Combos!
+    if (m.statuses.burn > 0 && m.statuses.poison > 0) {
+      m.statuses.burn = 0;
+      m.statuses.poison = 0;
+      addFloatText(m.x, m.y, 'VENOM BLAST!', '#a3e635', true);
+      state.novaWaves.push({ x: m.x, y: m.y, r: 0.3, maxR: 2.0, color: '#a3e635', life: 0.25, maxLife: 0.25 });
+      damageMonster(m, getHeroStats().atk * 1.9, 0, 0, true, 12);
+    } else if ((m.statuses.chill > 0 || m.stunTimer > 0) && m.statuses.bleed > 0) {
+      m.statuses.chill = 0;
+      m.statuses.bleed = 0;
+      addFloatText(m.x, m.y, 'SHATTER!', '#60a5fa', true);
+      spawnParticles(m.x, m.y, '#93c5fd', 14, 3.2);
+      damageMonster(m, getHeroStats().atk * 2.1, 0, 0, true, 18);
+    }
+  }
+
+  function damageMonster(m, rawDmg, knockDirX, knockDirY, canCrit = true, staggerGain = 6) {
+    if (!m || m.hp <= 0) return;
     const stats = getHeroStats();
     const isCrit = canCrit && Math.random() * 100 < stats.crit;
-    const dmg = Math.max(1, Math.round(rawDmg * (isCrit ? 1.85 : 0.92 + Math.random() * 0.16)));
+    let dmg = Math.max(1, Math.round(rawDmg * (isCrit ? stats.critDmg : 0.92 + Math.random() * 0.16)));
+
+    // Phase 2 Invulnerability Ritual Crystals give Boss 90% damage reduction
+    if (m.type === 'boss' && state.crystals.length > 0) {
+      dmg = Math.max(1, Math.round(dmg * 0.1));
+    } else if (m.type === 'boss' && m.staggeredTimer > 0) {
+      dmg = Math.round(dmg * 1.3);
+    }
 
     m.hp -= dmg;
     m.hitFlash = 0.14;
@@ -1629,28 +2100,56 @@
     if (m.tier !== 'boss') {
       m.vx += knockDirX * 3.4;
       m.vy += knockDirY * 3.4;
+    } else {
+      if (window.CryptCoop && window.CryptCoop.active && !window.CryptCoop.isHost) {
+        window.CryptCoop.sendBossHit(dmg);
+      }
+      if (m.staggeredTimer <= 0 && m.maxStagger > 0) {
+        m.stagger = Math.min(m.maxStagger, m.stagger + staggerGain);
+        if (m.stagger >= m.maxStagger) {
+          m.stagger = 0;
+          m.staggeredTimer = 2.5;
+          m.slamTelegraph = 0;
+          state.bossTelegraphs = [];
+          sfx.crit();
+          addFloatText(m.x, m.y, 'STAGGERED!', '#fde047', true);
+          showToast(`${m.name} Staggered for 2.5s (+30% DMG)!`);
+        }
+      }
+      // Phase 2 at 50% HP: AoE knockback + spawn 2-3 Ritual Crystals
+      if (m.phase === 1 && m.hp > 0 && m.hp <= m.maxHp * 0.5) {
+        m.phase = 2;
+        state.camera.shake = 8;
+        state.novaWaves.push({ x: m.x, y: m.y, r: 0.4, maxR: 3.4, color: '#ef4444', life: 0.35, maxLife: 0.35 });
+        const count = m.isGuardian ? 3 : 2;
+        for (let c = 0; c < count; c++) {
+          const ang = (Math.PI * 2 * c) / count;
+          const cx = clamp(m.x + Math.cos(ang) * 3.2, 2, MAP_W - 3);
+          const cy = clamp(m.y + Math.sin(ang) * 3.2, 2, MAP_H - 3);
+          state.crystals.push({ x: isPositionClear(cx, cy, 0.3) ? cx : m.x, y: isPositionClear(cx, cy, 0.3) ? cy : m.y, hp: Math.round(m.maxHp * 0.16), maxHp: Math.round(m.maxHp * 0.16) });
+        }
+        showToast('PHASE 2: Destroy the Ritual Crystals to break Boss Immunity!');
+      }
     }
+
+    // Charge Awakening Ultimate
+    state.player.ultCharge = Math.min(100, state.player.ultCharge + (isCrit ? 6 : 4) * stats.ultRate);
 
     if (stats.loh > 0 && state.player.hp > 0) {
       state.player.hp = Math.min(state.player.maxHp, state.player.hp + stats.loh);
     }
+    if (state.player.bladeOil && state.player.bladeOil.timer > 0) {
+      applyStatus(m, state.player.bladeOil.type, 3.0);
+    }
 
-    addFloatText(
-      m.x,
-      m.y,
-      isCrit ? `Critical! ${dmg}` : `${dmg}`,
-      isCrit ? '#facc15' : '#f8fafc',
-      isCrit
-    );
+    addFloatText(m.x, m.y, isCrit ? `Critical! ${dmg}` : `${dmg}`, isCrit ? '#facc15' : '#f8fafc', isCrit);
     spawnParticles(m.x, m.y, isCrit ? '#facc15' : '#dc2626', isCrit ? 10 : 5, 2.2);
     if (isCrit) {
       sfx.crit();
       state.camera.shake = Math.max(state.camera.shake, 4.5);
     }
 
-    if (m.hp <= 0) {
-      handleMonsterDeath(m);
-    }
+    if (m.hp <= 0) handleMonsterDeath(m);
   }
 
   function handleMonsterDeath(m) {
@@ -1658,26 +2157,48 @@
     if (idx !== -1) state.monsters.splice(idx, 1);
 
     state.player.kills += 1;
+    state.account.bestiary[m.name] = (state.account.bestiary[m.name] || 0) + 1;
+    advanceBounty('kills', 1);
+    if (m.tier === 'elite') advanceBounty('elites', 1);
+    if (m.tier === 'boss') advanceBounty('bosses', 1);
+
     spawnParticles(m.x, m.y, m.type === 'ghoul' ? '#60a5fa' : '#94a3b8', 16, 3.0);
 
-    // Molten affix death explosion
     if (m.affixes && m.affixes.includes('molten')) {
       sfx.fire();
       state.novaWaves.push({ x: m.x, y: m.y, r: 0.3, maxR: 2.1, color: '#f97316', life: 0.28, maxLife: 0.28 });
       spawnParticles(m.x, m.y, '#fb923c', 16, 3.6);
-      if (dist(m.x, m.y, state.player.x, state.player.y) <= 2.1) {
-        damagePlayer(Math.round(m.atk * 1.1));
-      }
+      if (dist(m.x, m.y, state.player.x, state.player.y) <= 2.1) damagePlayer(Math.round(m.atk * 1.1));
     }
 
     grantXp(m.xp);
     spawnLootDrop(m.x, m.y, m.isGuardian ? 'guardian' : m.tier);
 
     if (m.type === 'boss') {
+      state.crystals = [];
+      state.bossTelegraphs = [];
       state.stairs.unlocked = true;
       state.highestFloor = Math.max(state.highestFloor, state.floor + 1);
+      if (state.riftTier > 0) {
+        state.account.bestRiftTier = Math.max(state.account.bestRiftTier || 0, state.riftTier);
+        showToast(`Abyssal Rift Tier ${state.riftTier} Cleared!`);
+      } else {
+        showToast(`${m.name} Slain! Descent Stairs Unsealed!`);
+      }
+      if (m.isGuardian) {
+        for (const tr of WARDROBE_ITEMS.trails) {
+          if (tr.reqBoss === m.name && !state.account.wardrobeUnlocked.trails.includes(tr.id)) {
+            state.account.wardrobeUnlocked.trails.push(tr.id);
+            showToast(`Wardrobe Unlocked: ${tr.name} Trail!`);
+          }
+        }
+        for (const cp of WARDROBE_ITEMS.capes) {
+          if (cp.reqBoss === m.name && !state.account.wardrobeUnlocked.capes.includes(cp.id)) {
+            state.account.wardrobeUnlocked.capes.push(cp.id);
+          }
+        }
+      }
       state.camera.shake = 9;
-      showToast(`${m.name} Slain! Descent Stairs Unsealed!`);
       saveHeroProfile();
       updateHud();
     }
@@ -1722,106 +2243,168 @@
     const p = state.player;
     if (p.dead || p.attackCd > 0 || state.mode === 'TOWN') return;
     const cls = state.heroClass;
-    p.attackCd = cls === 'rogue' ? 0.25 : cls === 'sorcerer' ? 0.36 : 0.34;
+    p.attackCd = cls === 'rogue' ? 0.25 : cls === 'archer' ? 0.30 : cls === 'sorcerer' ? 0.36 : 0.34;
     p.attackAnim = 0.22;
 
     if (input.aimX !== null && input.aimY !== null) {
       p.facingX = input.aimX;
       p.facingY = input.aimY;
     } else {
-      autoFaceTarget(cls === 'sorcerer' ? 8.5 : 3.4);
+      autoFaceTarget(cls === 'sorcerer' || cls === 'archer' || cls === 'summoner' ? 9.5 : 3.4);
     }
 
     const stats = getHeroStats();
 
-    if (cls === 'sorcerer') {
-      // Shadow Bolt projectile
+    // Attack Ritual Crystals & Secret Walls & Oil Barrels in melee/projectile path
+    for (let c = state.crystals.length - 1; c >= 0; c--) {
+      const cr = state.crystals[c];
+      if (dist(p.x, p.y, cr.x, cr.y) <= (cls === 'archer' || cls === 'sorcerer' ? 8.5 : 2.3)) {
+        cr.hp -= stats.atk;
+        spawnParticles(cr.x, cr.y, '#c084fc', 6, 2.0);
+        if (cr.hp <= 0) {
+          state.crystals.splice(c, 1);
+          showToast(state.crystals.length === 0 ? 'Ritual Shield Broken!' : `${state.crystals.length} Crystals Remaining`);
+        }
+      }
+    }
+
+    if (cls === 'sorcerer' || cls === 'summoner') {
       sfx.arcane();
       state.projectiles.push({
-        kind: 'shadow',
-        x: p.x + p.facingX * 0.45,
-        y: p.y + p.facingY * 0.45,
-        vx: p.facingX * 11.2,
-        vy: p.facingY * 11.2,
-        dmg: stats.atk * 1.15,
-        aoe: 0.9,
-        life: 1.15
+        kind: cls === 'summoner' ? 'soul' : 'shadow',
+        x: p.x + p.facingX * 0.45, y: p.y + p.facingY * 0.45,
+        vx: p.facingX * 11.4, vy: p.facingY * 11.4,
+        dmg: stats.atk * 1.15, aoe: 0.9 * stats.aoeMult, life: 1.15, restoreMana: cls === 'summoner' ? 5 : 0
+      });
+      return;
+    }
+
+    if (cls === 'archer') {
+      sfx.slash();
+      state.projectiles.push({
+        kind: 'pierce',
+        x: p.x + p.facingX * 0.45, y: p.y + p.facingY * 0.45,
+        vx: p.facingX * 14.0, vy: p.facingY * 14.0,
+        dmg: stats.atk * 1.2, aoe: 0.7, life: 1.2, pierce: true
       });
       return;
     }
 
     sfx.slash();
     const reach = cls === 'rogue' ? 1.85 : 2.05;
+    const trail = WARDROBE_ITEMS.trails.find((t) => t.id === state.account.equippedTrail);
     state.slashArcs.push({
-      x: p.x,
-      y: p.y,
-      angle: Math.atan2(p.facingY, p.facingX),
-      life: 0.18,
-      maxLife: 0.18,
-      radius: cls === 'rogue' ? 38 : 44,
-      color: cls === 'rogue' ? '#4ade80' : '#fde047'
+      x: p.x, y: p.y, angle: Math.atan2(p.facingY, p.facingX),
+      life: 0.18, maxLife: 0.18, radius: cls === 'rogue' ? 38 : 44,
+      color: trail ? trail.color : (cls === 'rogue' ? '#4ade80' : '#fde047')
     });
 
     const mult = cls === 'rogue' ? 0.9 : 1.0;
     for (let i = state.monsters.length - 1; i >= 0; i--) {
       const m = state.monsters[i];
-      const dx = m.x - p.x;
-      const dy = m.y - p.y;
-      const d = Math.hypot(dx, dy);
+      const dx = m.x - p.x, dy = m.y - p.y, d = Math.hypot(dx, dy);
       if (d <= reach + m.radius) {
         const dot = (dx / (d || 1)) * p.facingX + (dy / (d || 1)) * p.facingY;
-        if (dot >= -0.25 || d < 1.05) {
-          damageMonster(m, stats.atk * mult, dx / (d || 1), dy / (d || 1), true);
-        }
+        if (dot >= -0.25 || d < 1.05) damageMonster(m, stats.atk * mult, dx / (d || 1), dy / (d || 1), true, 8);
       }
     }
-    breakNearbyProps(p.x + p.facingX * 0.9, p.y + p.facingY * 0.9, 1.45);
+    breakNearbyProps(p.x + p.facingX * 0.9, p.y + p.facingY * 0.9, 1.55);
   }
   const performSwordSlash = performBasicAttack;
 
   function castSkill(slotId) {
     const p = state.player;
     if (state.mode === 'TOWN') return;
+    if (slotId === 4) { castWeaponSkill(); return; }
     const cfg = getActiveSkillConfig()[slotId];
-    if (!cfg || p.dead) return;
-    if (p.skillCds[slotId] > 0) return;
-    if (p.mp < cfg.mana) {
-      showToast('Not enough Mana!');
-      return;
-    }
+    if (!cfg || p.dead || p.skillCds[slotId] > 0) return;
+    if (p.mp < cfg.mana) { showToast('Not enough Mana!'); return; }
 
     p.mp -= cfg.mana;
     p.skillCds[slotId] = cfg.cd;
     p.castAnim = 0.28;
     const stats = getHeroStats();
+    const rankMult = 1 + ((p.skillRanks[slotId] || 1) - 1) * 0.18;
     const cls = state.heroClass;
+    const stag = cfg.stagger || 14;
+
+    if (cls === 'archer') {
+      if (slotId === 1) {
+        // Arrow Rain AoE volley
+        autoFaceTarget(9.0);
+        sfx.slash();
+        const tx = p.x + p.facingX * 3.5, ty = p.y + p.facingY * 3.5;
+        state.novaWaves.push({ x: tx, y: ty, r: 0.3, maxR: 2.8, color: '#a3e635', life: 0.35, maxLife: 0.35 });
+        for (let i = state.monsters.length - 1; i >= 0; i--) {
+          const m = state.monsters[i];
+          if (dist(tx, ty, m.x, m.y) <= 2.9 + m.radius) damageMonster(m, stats.atk * 1.7 * rankMult, 0, 0, true, stag);
+        }
+      } else if (slotId === 2) {
+        // Vault & Caltrops (backflip + slowing poison spikes)
+        sfx.slash();
+        state.poisonClouds.push({ x: p.x, y: p.y, r: 2.2, life: 4.0, tick: 0, dmg: stats.atk * 0.65 * rankMult, status: 'chill' });
+        moveWithSlide(p, -p.facingX * 2.2, -p.facingY * 2.2, 0.31);
+        updateFogOfWar();
+      } else if (slotId === 3) {
+        // Charged Snipe high-crit beam
+        autoFaceTarget(10.0);
+        sfx.crit();
+        state.projectiles.push({ kind: 'pierce', x: p.x + p.facingX * 0.4, y: p.y + p.facingY * 0.4, vx: p.facingX * 16, vy: p.facingY * 16, dmg: stats.atk * 2.6 * rankMult, aoe: 1.0, life: 1.1, pierce: true, stagger: stag });
+      }
+      updateHud();
+      return;
+    }
+
+    if (cls === 'summoner') {
+      if (slotId === 1) {
+        // Raise Skeletons (up to 4)
+        sfx.holy();
+        const currentSkels = state.minions.filter((mn) => mn.kind === 'skel');
+        if (currentSkels.length >= 4) state.minions.splice(state.minions.indexOf(currentSkels[0]), 1);
+        const addCount = Math.min(2, 4 - state.minions.filter((mn) => mn.kind === 'skel').length);
+        for (let k = 0; k < addCount; k++) {
+          state.minions.push({ kind: 'skel', x: p.x + (k ? 0.6 : -0.6), y: p.y + 0.5, hp: Math.round(90 * stats.minionMult), maxHp: Math.round(90 * stats.minionMult), dmg: Math.round(stats.atk * 0.85 * rankMult * stats.minionMult), cd: 0, life: 35 });
+        }
+        showToast('Skeletal Warriors Raised!');
+      } else if (slotId === 2) {
+        // Summon Hell Imp (ranged fireball turret)
+        sfx.fire();
+        state.minions.push({ kind: 'imp', x: p.x + p.facingX * 0.8, y: p.y + p.facingY * 0.8, hp: Math.round(70 * stats.minionMult), maxHp: Math.round(70 * stats.minionMult), dmg: Math.round(stats.atk * 1.1 * rankMult * stats.minionMult), cd: 0, life: 22 });
+      } else if (slotId === 3) {
+        // Dark Pact / Corpse Detonate
+        sfx.arcane();
+        for (let i = state.minions.length - 1; i >= 0; i--) {
+          const mn = state.minions[i];
+          if (mn.kind === 'skel' && mn.hp < mn.maxHp * 0.65) {
+            state.novaWaves.push({ x: mn.x, y: mn.y, r: 0.3, maxR: 2.5, color: '#2dd4bf', life: 0.28, maxLife: 0.28 });
+            for (let j = state.monsters.length - 1; j >= 0; j--) {
+              const m = state.monsters[j];
+              if (dist(mn.x, mn.y, m.x, m.y) <= 2.6 + m.radius) damageMonster(m, stats.atk * 2.1 * rankMult, 0, 0, true, stag);
+            }
+            state.minions.splice(i, 1);
+          } else {
+            mn.hp = mn.maxHp;
+          }
+        }
+      }
+      updateHud();
+      return;
+    }
 
     if (cls === 'rogue') {
       if (slotId === 1) {
-        // Multishot (3-bolt fan)
         autoFaceTarget(9.0);
         sfx.slash();
         const baseAng = Math.atan2(p.facingY, p.facingX);
         for (const off of [-0.24, 0, 0.24]) {
           const a = baseAng + off;
-          state.projectiles.push({
-            kind: 'bolt',
-            x: p.x + Math.cos(a) * 0.4,
-            y: p.y + Math.sin(a) * 0.4,
-            vx: Math.cos(a) * 12.2,
-            vy: Math.sin(a) * 12.2,
-            dmg: stats.atk * 1.25,
-            aoe: 0.8,
-            life: 1.0
-          });
+          state.projectiles.push({ kind: 'bolt', x: p.x + Math.cos(a) * 0.4, y: p.y + Math.sin(a) * 0.4, vx: Math.cos(a) * 12.2, vy: Math.sin(a) * 12.2, dmg: stats.atk * 1.25 * rankMult, aoe: 0.8, life: 1.0, status: 'bleed' });
         }
       } else if (slotId === 2) {
-        // Poison Trap cloud at hero feet
         sfx.arcane();
-        state.poisonClouds.push({ x: p.x, y: p.y, r: 2.3, life: 4.5, tick: 0, dmg: stats.atk * 0.72 });
+        state.poisonClouds.push({ x: p.x, y: p.y, r: 2.3, life: 4.5, tick: 0, dmg: stats.atk * 0.72 * rankMult, status: 'poison' });
         spawnParticles(p.x, p.y, '#4ade80', 14, 2.5);
       } else if (slotId === 3) {
-        // Shadow Dash forward + slash
         sfx.slash();
         moveWithSlide(p, p.facingX * 2.8, p.facingY * 2.8, 0.31);
         updateFogOfWar();
@@ -1829,9 +2412,7 @@
         for (let i = state.monsters.length - 1; i >= 0; i--) {
           const m = state.monsters[i];
           const d = dist(p.x, p.y, m.x, m.y);
-          if (d <= 2.2 + m.radius) {
-            damageMonster(m, stats.atk * 1.65, (m.x - p.x) / (d || 1), (m.y - p.y) / (d || 1), true);
-          }
+          if (d <= 2.2 + m.radius) damageMonster(m, stats.atk * 1.65 * rankMult, (m.x - p.x) / (d || 1), (m.y - p.y) / (d || 1), true, stag);
         }
       }
       updateHud();
@@ -1840,41 +2421,30 @@
 
     if (cls === 'sorcerer') {
       if (slotId === 1) {
-        // Bone Nova
         sfx.arcane();
-        state.novaWaves.push({ x: p.x, y: p.y, r: 0.4, maxR: 2.7, color: '#e2e8f0', life: 0.3, maxLife: 0.3 });
+        state.novaWaves.push({ x: p.x, y: p.y, r: 0.4, maxR: 2.7 * stats.aoeMult, color: '#e2e8f0', life: 0.3, maxLife: 0.3 });
         for (let i = state.monsters.length - 1; i >= 0; i--) {
           const m = state.monsters[i];
           const d = dist(p.x, p.y, m.x, m.y);
-          if (d <= 2.7 + m.radius) {
-            damageMonster(m, stats.atk * 1.6, (m.x - p.x) / (d || 1), (m.y - p.y) / (d || 1), true);
+          if (d <= 2.7 * stats.aoeMult + m.radius) {
+            damageMonster(m, stats.atk * 1.6 * rankMult, (m.x - p.x) / (d || 1), (m.y - p.y) / (d || 1), true, stag);
+            applyStatus(m, 'bleed', 3.0);
           }
         }
         breakNearbyProps(p.x, p.y, 2.5);
       } else if (slotId === 2) {
-        // Frost Orb projectile
         autoFaceTarget(9.0);
         sfx.arcane();
-        state.projectiles.push({
-          kind: 'frost',
-          x: p.x + p.facingX * 0.45,
-          y: p.y + p.facingY * 0.45,
-          vx: p.facingX * 9.0,
-          vy: p.facingY * 9.0,
-          dmg: stats.atk * 2.0,
-          aoe: 2.3,
-          life: 1.5
-        });
+        state.projectiles.push({ kind: 'frost', x: p.x + p.facingX * 0.45, y: p.y + p.facingY * 0.45, vx: p.facingX * 9.0, vy: p.facingY * 9.0, dmg: stats.atk * 2.0 * rankMult, aoe: 2.3 * stats.aoeMult, life: 1.5, status: 'chill', stagger: stag });
       } else if (slotId === 3) {
-        // Soul Drain AoE + Lifesteal
         sfx.holy();
         let totalHeal = 0;
-        state.novaWaves.push({ x: p.x, y: p.y, r: 0.4, maxR: 3.1, color: '#c084fc', life: 0.36, maxLife: 0.36 });
+        state.novaWaves.push({ x: p.x, y: p.y, r: 0.4, maxR: 3.1 * stats.aoeMult, color: '#c084fc', life: 0.36, maxLife: 0.36 });
         for (let i = state.monsters.length - 1; i >= 0; i--) {
           const m = state.monsters[i];
           const d = dist(p.x, p.y, m.x, m.y);
-          if (d <= 3.1 + m.radius) {
-            damageMonster(m, stats.atk * 1.5, (m.x - p.x) / (d || 1), (m.y - p.y) / (d || 1), true);
+          if (d <= 3.1 * stats.aoeMult + m.radius) {
+            damageMonster(m, stats.atk * 1.5 * rankMult, (m.x - p.x) / (d || 1), (m.y - p.y) / (d || 1), true, stag);
             totalHeal += Math.round(p.maxHp * 0.12);
           }
         }
@@ -1888,7 +2458,7 @@
       return;
     }
 
-    // Paladin default kit
+    // Paladin kit (Whirlwind Cleave, Shield Bash, Holy Nova)
     if (slotId === 1) {
       sfx.slash();
       state.novaWaves.push({ x: p.x, y: p.y, r: 0.4, maxR: 2.35, color: '#facc15', life: 0.28, maxLife: 0.28 });
@@ -1896,24 +2466,22 @@
       for (let i = state.monsters.length - 1; i >= 0; i--) {
         const m = state.monsters[i];
         const d = dist(p.x, p.y, m.x, m.y);
-        if (d <= 2.35 + m.radius) {
-          damageMonster(m, stats.atk * 1.65, (m.x - p.x) / (d || 1), (m.y - p.y) / (d || 1), true);
-        }
+        if (d <= 2.35 + m.radius) damageMonster(m, stats.atk * 1.65 * rankMult, (m.x - p.x) / (d || 1), (m.y - p.y) / (d || 1), true, stag);
       }
       breakNearbyProps(p.x, p.y, 2.35);
     } else if (slotId === 2) {
-      autoFaceTarget(9.0);
-      sfx.fire();
-      state.projectiles.push({
-        kind: 'fire',
-        x: p.x + p.facingX * 0.45,
-        y: p.y + p.facingY * 0.45,
-        vx: p.facingX * 10.5,
-        vy: p.facingY * 10.5,
-        dmg: stats.atk * 2.1,
-        aoe: 2.0,
-        life: 1.4
-      });
+      // Shield Bash (high stagger + stun)
+      autoFaceTarget(3.5);
+      sfx.anvil();
+      moveWithSlide(p, p.facingX * 1.1, p.facingY * 1.1, 0.31);
+      state.novaWaves.push({ x: p.x + p.facingX * 0.8, y: p.y + p.facingY * 0.8, r: 0.2, maxR: 1.8, color: '#fde047', life: 0.22, maxLife: 0.22 });
+      for (let i = state.monsters.length - 1; i >= 0; i--) {
+        const m = state.monsters[i];
+        if (dist(p.x + p.facingX * 0.7, p.y + p.facingY * 0.7, m.x, m.y) <= 1.9 + m.radius) {
+          m.stunTimer = Math.max(m.stunTimer, 1.3);
+          damageMonster(m, stats.atk * 1.55 * rankMult, p.facingX, p.facingY, true, stag);
+        }
+      }
     } else if (slotId === 3) {
       sfx.holy();
       const heal = Math.round(p.maxHp * 0.28);
@@ -1926,12 +2494,248 @@
         const d = dist(p.x, p.y, m.x, m.y);
         if (d <= 3.1 + m.radius) {
           m.stunTimer = Math.max(m.stunTimer, 1.15);
-          damageMonster(m, stats.atk * 1.45, (m.x - p.x) / (d || 1), (m.y - p.y) / (d || 1), true);
+          damageMonster(m, stats.atk * 1.45 * rankMult, (m.x - p.x) / (d || 1), (m.y - p.y) / (d || 1), true, stag);
         }
       }
       breakNearbyProps(p.x, p.y, 3.0);
     }
     updateHud();
+  }
+
+  function getEquippedWeaponSpec() {
+    const w = state.player.equipped.weapon;
+    const wType = (w && w.weaponType && WEAPON_TYPES[w.weaponType]) ? w.weaponType : (HERO_CLASSES[state.heroClass]?.defaultWeapon || 'greatsword');
+    return WEAPON_TYPES[wType];
+  }
+
+  function castWeaponSkill() {
+    const p = state.player;
+    if (p.dead || state.mode === 'TOWN' || p.skillCds[4] > 0) return;
+    const spec = getEquippedWeaponSpec();
+    if (p.mp < spec.mana) { showToast('Not enough Mana!'); return; }
+    p.mp -= spec.mana;
+    p.skillCds[4] = spec.cd;
+    p.castAnim = 0.25;
+    const stats = getHeroStats();
+    autoFaceTarget(7.5);
+
+    if (spec.id === 'arcane_tome') {
+      sfx.portal();
+      moveWithSlide(p, p.facingX * 3.4, p.facingY * 3.4, 0.31);
+      updateFogOfWar();
+      state.novaWaves.push({ x: p.x, y: p.y, r: 0.2, maxR: 2.0, color: '#c084fc', life: 0.24, maxLife: 0.24 });
+    } else if (spec.id === 'longbow' || spec.id === 'crossbow') {
+      sfx.fire();
+      const base = Math.atan2(p.facingY, p.facingX);
+      const angles = spec.id === 'longbow' ? [-0.3, -0.15, 0, 0.15, 0.3] : [0];
+      for (const off of angles) {
+        const a = base + off;
+        state.projectiles.push({ kind: spec.id === 'crossbow' ? 'fire' : 'bolt', x: p.x, y: p.y, vx: Math.cos(a) * 12, vy: Math.sin(a) * 12, dmg: stats.atk * (spec.id === 'crossbow' ? 2.2 : 1.15), aoe: spec.id === 'crossbow' ? 2.2 : 0.8, life: 1.1, stagger: spec.stagger });
+      }
+    } else {
+      sfx.anvil();
+      state.novaWaves.push({ x: p.x, y: p.y, r: 0.3, maxR: 2.6, color: '#fb923c', life: 0.3, maxLife: 0.3 });
+      for (let i = state.monsters.length - 1; i >= 0; i--) {
+        const m = state.monsters[i];
+        const d = dist(p.x, p.y, m.x, m.y);
+        if (d <= 2.6 + m.radius) {
+          if (spec.id === 'necro_staff') m.stunTimer = Math.max(m.stunTimer, 1.5);
+          damageMonster(m, stats.atk * 1.75, (m.x - p.x) / (d || 1), (m.y - p.y) / (d || 1), true, spec.stagger);
+        }
+      }
+    }
+    updateHud();
+  }
+
+  function castUltimate() {
+    const p = state.player;
+    if (p.dead || state.mode === 'TOWN') return;
+    if (p.ultCharge < 100) {
+      showToast(`Ultimate ${Math.floor(p.ultCharge)}% Charged`);
+      return;
+    }
+    p.ultCharge = 0;
+    const stats = getHeroStats();
+    const cls = state.heroClass;
+    sfx.legendary();
+    state.camera.shake = 8;
+
+    if (cls === 'paladin') {
+      p.ultTimer = 8.0;
+      p.hp = Math.min(p.maxHp, p.hp + Math.round(p.maxHp * 0.35));
+      showToast('AWAKENING: Avatar of Light!');
+    } else if (cls === 'rogue') {
+      for (let i = 0; i < 3; i++) {
+        state.minions.push({ kind: 'clone', x: p.x + Math.cos(i * 2.1), y: p.y + Math.sin(i * 2.1), hp: 120, maxHp: 120, dmg: Math.round(stats.atk * 1.2), cd: 0, life: 12 });
+      }
+      showToast('AWAKENING: Shadow Clone Army!');
+    } else if (cls === 'sorcerer') {
+      for (let k = 0; k < 5; k++) {
+        const mx = p.x + (Math.random() - 0.5) * 6;
+        const my = p.y + (Math.random() - 0.5) * 6;
+        state.novaWaves.push({ x: mx, y: my, r: 0.4, maxR: 2.8, color: '#f97316', life: 0.4, maxLife: 0.4 });
+        for (let i = state.monsters.length - 1; i >= 0; i--) {
+          const m = state.monsters[i];
+          if (dist(mx, my, m.x, m.y) <= 2.8 + m.radius) {
+            damageMonster(m, stats.atk * 2.2, 0, 0, true, 16);
+            applyStatus(m, 'burn', 4.0);
+          }
+        }
+      }
+      showToast('AWAKENING: Meteor Apocalypse!');
+    } else if (cls === 'archer') {
+      for (let i = 0; i < 12; i++) {
+        const a = (Math.PI * 2 * i) / 12;
+        state.projectiles.push({ kind: 'fire', x: p.x, y: p.y, vx: Math.cos(a) * 13, vy: Math.sin(a) * 13, dmg: stats.atk * 2.3, aoe: 1.8, life: 1.1, status: 'burn' });
+      }
+      showToast('AWAKENING: Phoenix Volley!');
+    } else if (cls === 'summoner') {
+      state.minions.push({ kind: 'colossus', x: p.x + 0.8, y: p.y + 0.8, hp: Math.round(420 * stats.minionMult), maxHp: Math.round(420 * stats.minionMult), dmg: Math.round(stats.atk * 2.2 * stats.minionMult), cd: 0, life: 25 });
+      showToast('AWAKENING: Bone Colossus Summoned!');
+    }
+    updateHud();
+  }
+
+  function performDodge() {
+    const p = state.player;
+    if (p.dead || p.dodgeCd > 0) return;
+    p.dodgeCd = 2.0;
+    p.invulnTimer = 0.35;
+    sfx.slash();
+    moveWithSlide(p, p.facingX * 2.3, p.facingY * 2.3, 0.31);
+    updateFogOfWar();
+    spawnParticles(p.x, p.y, '#93c5fd', 8, 2.4);
+    updateHud();
+  }
+
+  function swapWeaponLoadout() {
+    const p = state.player;
+    const oldW = p.equipped.weapon;
+    const oldO = p.equipped.offhand;
+    if (!p.swapSet.weapon && !p.swapSet.offhand) {
+      showToast('Place a backup weapon in Swap Set (Bag) first!');
+      return;
+    }
+    p.equipped.weapon = p.swapSet.weapon;
+    p.equipped.offhand = p.swapSet.offhand;
+    p.swapSet.weapon = oldW;
+    p.swapSet.offhand = oldO;
+    p.activeSwapIdx = p.activeSwapIdx === 1 ? 2 : 1;
+    syncPlayerVitalsBounds();
+    syncClassSkillLabels();
+    sfx.loot();
+    saveHeroProfile();
+    updateHud(true);
+    showToast(`Swapped to Weapon Set ${p.activeSwapIdx}`);
+  }
+
+  function toggleMinionStance() {
+    state.minionStance = state.minionStance === 'aggressive' ? 'guard' : 'aggressive';
+    sfx.loot();
+    updateHud(true);
+    showToast(`Minion & Pet Stance: ${state.minionStance.toUpperCase()}`);
+  }
+
+  function spawnCompanionPet() {
+    const p = state.player;
+    state.petEntity = {
+      id: p.petId || 'hound',
+      x: p.x - 0.8,
+      y: p.y + 0.6,
+      cd: 0,
+      phase: 0
+    };
+  }
+
+  function updatePets(dt) {
+    const pet = state.petEntity;
+    if (!pet) return;
+    const p = state.player;
+    const cfg = PETS_CONFIG[p.petId] || PETS_CONFIG.hound;
+    const rank = p.petRanks[p.petId] || 1;
+    const pickupR = 3.6 + (rank - 1) * 1.1;
+    pet.cd = Math.max(0, pet.cd - dt);
+    pet.phase += dt * 7;
+
+    let tx = p.x - p.facingX * 0.9;
+    let ty = p.y - p.facingY * 0.9;
+    let targetDropIdx = -1;
+
+    // Auto-loot Gold & filtered gear
+    for (let i = 0; i < state.lootDrops.length; i++) {
+      const d = state.lootDrops[i];
+      if (d.z > 2) continue;
+      if ((d.kind === 'gold' || passesLootFilter(d)) && dist(p.x, p.y, d.x, d.y) <= pickupR) {
+        tx = d.x;
+        ty = d.y;
+        targetDropIdx = i;
+        break;
+      }
+    }
+
+    const dx = tx - pet.x, dy = ty - pet.y, d = Math.hypot(dx, dy);
+    if (d > 0.25) {
+      const sp = targetDropIdx !== -1 ? 7.2 : 5.2;
+      pet.x += (dx / d) * Math.min(d, sp * dt);
+      pet.y += (dy / d) * Math.min(d, sp * dt);
+    }
+    if (targetDropIdx !== -1 && dist(pet.x, pet.y, tx, ty) <= 0.65) {
+      collectLootDrop(targetDropIdx);
+    }
+
+    // Active Pet Combat Skill
+    if (state.mode === 'DUNGEON' && pet.cd <= 0 && state.monsters.length > 0) {
+      const enemy = findNearestEnemy(state.minionStance === 'guard' ? 4.5 : 7.5);
+      if (enemy) {
+        pet.cd = Math.max(2.0, cfg.cd - (rank - 1) * 0.45);
+        const pDmg = Math.round(getHeroStats().atk * (0.75 + rank * 0.18));
+        if (cfg.id === 'hound') {
+          damageMonster(enemy, pDmg, 0, 0, true, 8);
+          applyStatus(enemy, 'bleed', 3.5);
+        } else if (cfg.id === 'wisp') {
+          state.projectiles.push({ kind: 'fire', x: pet.x, y: pet.y, vx: ((enemy.x - pet.x) / (dist(pet.x, pet.y, enemy.x, enemy.y) || 1)) * 10, vy: ((enemy.y - pet.y) / (dist(pet.x, pet.y, enemy.x, enemy.y) || 1)) * 10, dmg: pDmg, aoe: 1.2, life: 0.9, status: 'burn' });
+        } else if (cfg.id === 'hatchling') {
+          state.novaWaves.push({ x: pet.x, y: pet.y, r: 0.2, maxR: 2.5, color: '#94a3b8', life: 0.25, maxLife: 0.25 });
+          damageMonster(enemy, pDmg, 0, 0, true, 26);
+        }
+      }
+    }
+  }
+
+  function updateMinions(dt) {
+    const p = state.player;
+    for (let i = state.minions.length - 1; i >= 0; i--) {
+      const mn = state.minions[i];
+      mn.life -= dt;
+      mn.cd = Math.max(0, mn.cd - dt);
+      if (mn.life <= 0 || mn.hp <= 0) {
+        state.minions.splice(i, 1);
+        continue;
+      }
+      const searchR = state.minionStance === 'guard' ? 4.5 : 8.5;
+      let target = null, bestD = searchR;
+      for (const m of state.monsters) {
+        const d = dist(p.x, p.y, m.x, m.y);
+        if (d < bestD) { bestD = d; target = m; }
+      }
+      if (target) {
+        const d = dist(mn.x, mn.y, target.x, target.y);
+        if (mn.kind === 'imp') {
+          if (mn.cd <= 0 && d <= 7.5) {
+            mn.cd = 1.25;
+            state.projectiles.push({ kind: 'fire', x: mn.x, y: mn.y, vx: ((target.x - mn.x) / (d || 1)) * 9.5, vy: ((target.y - mn.y) / (d || 1)) * 9.5, dmg: mn.dmg, aoe: 1.1, life: 0.9, status: 'burn' });
+          }
+        } else if (d > 1.1) {
+          moveWithSlide(mn, ((target.x - mn.x) / (d || 1)) * 4.2 * dt, ((target.y - mn.y) / (d || 1)) * 4.2 * dt, 0.28);
+        } else if (mn.cd <= 0) {
+          mn.cd = 0.95;
+          damageMonster(target, mn.dmg, 0, 0, true, mn.kind === 'colossus' ? 14 : 4);
+        }
+      } else {
+        const dP = dist(mn.x, mn.y, p.x, p.y);
+        if (dP > 2.2) moveWithSlide(mn, ((p.x - mn.x) / dP) * 4.4 * dt, ((p.y - mn.y) / dP) * 4.4 * dt, 0.28);
+      }
+    }
   }
 
   function drinkHealthPotion() {
@@ -2011,6 +2815,11 @@
       else if (k === '1') castSkill(1);
       else if (k === '2') castSkill(2);
       else if (k === '3') castSkill(3);
+      else if (k === '4') castSkill(4);
+      else if (k === 'f') castUltimate();
+      else if (k === 'shift') performDodge();
+      else if (k === 'x') swapWeaponLoadout();
+      else if (k === 'g') toggleMinionStance();
       else if (k === 'q') drinkHealthPotion();
       else if (k === 'r') drinkManaElixir();
       else if (k === 'e') lootNearestGroundDrop();
@@ -2061,10 +2870,15 @@
     bindBtn(dom.btnSkill1, () => castSkill(1));
     bindBtn(dom.btnSkill2, () => castSkill(2));
     bindBtn(dom.btnSkill3, () => castSkill(3));
+    bindBtn(dom.btnSkill4, () => castSkill(4));
+    bindBtn(dom.btnUltimate, castUltimate);
+    bindBtn(dom.btnDodge, performDodge);
+    bindBtn(dom.btnSwapLoadout, swapWeaponLoadout);
+    bindBtn(dom.btnMinionStance, toggleMinionStance);
     bindBtn(dom.btnPotion, drinkHealthPotion);
     bindBtn(dom.btnManaElixir, drinkManaElixir);
 
-    // Canvas Tap / Click: Town Station tap OR Loot Nameplate hit-test OR Basic Attack
+    // Canvas Tap / Click: Town Station tap, Dungeon Crystal/Wall/Event tap, Loot Nameplate OR Attack
     canvas.addEventListener('pointerdown', (e) => {
       sfx.unlock();
       if (state.screen === 'MAIN_MENU' || state.screen === 'CHAR_CREATE') return;
@@ -2073,11 +2887,11 @@
       const rect = canvas.getBoundingClientRect();
       const sx = e.clientX - rect.left;
       const sy = e.clientY - rect.top;
+      const worldX = sx - rect.width * 0.5 + state.camera.x;
+      const worldY = sy - rect.height * 0.5 + state.camera.y;
+      const wp = isoToWorld(worldX, worldY);
 
       if (state.mode === 'TOWN') {
-        const worldX = sx - rect.width * 0.5 + state.camera.x;
-        const worldY = sy - rect.height * 0.5 + state.camera.y;
-        const wp = isoToWorld(worldX, worldY);
         for (const npc of state.townNpcs) {
           if (dist(wp.x, wp.y, npc.x, npc.y) <= 1.65) {
             openTownNpcDrawer(npc.id);
@@ -2087,26 +2901,33 @@
         return;
       }
 
-      // 1. Check tappable ground item nameplates first
+      // Check tappable ground item nameplates first
       for (let i = state.lootDrops.length - 1; i >= 0; i--) {
         const d = state.lootDrops[i];
         if (!d.screenRect || !passesLootFilter(d)) continue;
         if (sx >= d.screenRect.x && sx <= d.screenRect.x + d.screenRect.w &&
             sy >= d.screenRect.y && sy <= d.screenRect.y + d.screenRect.h) {
-          if (dist(state.player.x, state.player.y, d.x, d.y) <= 4.5) {
-            collectLootDrop(i);
-          } else {
-            state.pendingLootTarget = d;
-            showToast(`Moving to pick up ${d.label}`);
-          }
+          if (dist(state.player.x, state.player.y, d.x, d.y) <= 4.5) collectLootDrop(i);
+          else { state.pendingLootTarget = d; showToast(`Moving to pick up ${d.label}`); }
           return;
         }
       }
 
-      // 2. Otherwise aim toward click & attack
-      const worldX = sx - rect.width * 0.5 + state.camera.x;
-      const worldY = sy - rect.height * 0.5 + state.camera.y;
-      const wp = isoToWorld(worldX, worldY);
+      // Check Cracked Illusion Wall tap
+      for (let i = state.secretWalls.length - 1; i >= 0; i--) {
+        const sw = state.secretWalls[i];
+        if (!sw.broken && dist(wp.x, wp.y, sw.x, sw.y) <= 1.5 && dist(state.player.x, state.player.y, sw.x, sw.y) <= 3.5) {
+          sw.broken = true;
+          state.grid[sw.gy][sw.gx] = TILE.SANCTUM;
+          state.fogDirty = true;
+          sfx.anvil();
+          spawnLootDrop(sw.x, sw.y, 'elite');
+          showToast('Secret Treasure Room Discovered!');
+          return;
+        }
+      }
+
+      // Aim toward click & attack
       const dx = wp.x - state.player.x;
       const dy = wp.y - state.player.y;
       const len = Math.hypot(dx, dy) || 1;
@@ -2118,14 +2939,30 @@
     });
 
     // Main Menu & Character Creation
-    dom.btnContinueTown.addEventListener('click', () => {
+    dom.btnContinueTown.addEventListener('click', () => { sfx.unlock(); enterTown(); });
+    dom.btnOpenCharCreate.addEventListener('click', () => { sfx.unlock(); setScreen('CHAR_CREATE'); });
+    dom.btnOpenCoopMenu.addEventListener('click', () => { sfx.unlock(); openTownNpcDrawer('coop'); });
+    dom.btnOpenSaveTransfer.addEventListener('click', () => {
       sfx.unlock();
-      enterTown();
+      dom.saveCodeInput.value = exportSaveCode();
+      dom.saveTransferDrawer.showModal();
     });
-    dom.btnOpenCharCreate.addEventListener('click', () => {
-      sfx.unlock();
-      setScreen('CHAR_CREATE');
+    dom.btnCloseSaveTransfer.addEventListener('click', () => dom.saveTransferDrawer.close());
+    dom.btnCopySaveCode.addEventListener('click', () => {
+      const code = exportSaveCode();
+      dom.saveCodeInput.value = code;
+      navigator.clipboard?.writeText(code).catch(() => {});
+      showToast('Save Code Copied!');
     });
+    dom.btnImportSaveCode.addEventListener('click', () => {
+      if (importSaveCode(dom.saveCodeInput.value)) {
+        dom.saveTransferDrawer.close();
+        showToast('Save Imported!');
+      } else {
+        showToast('Invalid Save Code!');
+      }
+    });
+
     dom.btnCharCreateBack.addEventListener('click', () => setScreen('MAIN_MENU'));
     dom.btnRandomName.addEventListener('click', () => {
       sfx.unlock();
@@ -2133,7 +2970,7 @@
     });
     dom.btnForgeHero.addEventListener('click', () => {
       sfx.unlock();
-      createNewHero(dom.heroNameInput.value, state.selectedCreateClass);
+      createNewHero(dom.heroNameInput.value, state.selectedCreateClass, state.selectedCreatePet);
     });
 
     const toggleMuteAll = () => {
@@ -2144,34 +2981,40 @@
     };
     dom.btnAudioToggle.addEventListener('click', toggleMuteAll);
     dom.btnHudAudio.addEventListener('click', toggleMuteAll);
+    dom.btnManualSave.addEventListener('click', () => { sfx.unlock(); saveHeroProfile(true); });
 
     // Town Quick Dock & NPC Drawer
     dom.btnTownForge.addEventListener('click', () => { sfx.unlock(); openTownNpcDrawer('blacksmith'); });
     dom.btnTownStash.addEventListener('click', () => { sfx.unlock(); openTownNpcDrawer('stash'); });
     dom.btnTownApothecary.addEventListener('click', () => { sfx.unlock(); openTownNpcDrawer('apothecary'); });
+    dom.btnTownBounties.addEventListener('click', () => { sfx.unlock(); openTownNpcDrawer('bounties'); });
+    dom.btnTownPets.addEventListener('click', () => { sfx.unlock(); openTownNpcDrawer('pets'); });
+    dom.btnTownCodex.addEventListener('click', () => { sfx.unlock(); openTownNpcDrawer('codex'); });
+    dom.btnTownWardrobe.addEventListener('click', () => { sfx.unlock(); openTownNpcDrawer('wardrobe'); });
+    dom.btnTownCoop.addEventListener('click', () => { sfx.unlock(); openTownNpcDrawer('coop'); });
     dom.btnTownWaypoint.addEventListener('click', () => { sfx.unlock(); openTownNpcDrawer('waypoint'); });
-    dom.btnTownMenu.addEventListener('click', () => {
-      saveHeroProfile();
-      setScreen('MAIN_MENU');
-    });
+    dom.btnTownMenu.addEventListener('click', () => { saveHeroProfile(); setScreen('MAIN_MENU'); });
     dom.btnCloseTownNpc.addEventListener('click', () => dom.townNpcDrawer.close());
     dom.townNpcDrawer.addEventListener('click', (e) => {
       if (e.target === dom.townNpcDrawer) dom.townNpcDrawer.close();
     });
 
-    // Top-right & modal controls
+    // Inventory Tabs & Sort Bag
     dom.btnInventory.addEventListener('click', () => { sfx.unlock(); toggleInventory(); });
     dom.btnCloseInventory.addEventListener('click', () => toggleInventory(false));
     dom.inventoryDrawer.addEventListener('click', (e) => {
       if (e.target === dom.inventoryDrawer) toggleInventory(false);
     });
-
-    dom.btnTownPortal.addEventListener('click', () => {
-      sfx.unlock();
-      sfx.portal();
-      enterTown();
+    dom.invTabGear.addEventListener('click', () => { state.invTab = 'gear'; renderInventoryUI(); });
+    dom.invTabSkills.addEventListener('click', () => { state.invTab = 'skills'; renderInventoryUI(); });
+    dom.invTabMastery.addEventListener('click', () => { state.invTab = 'mastery'; renderInventoryUI(); });
+    dom.btnSortBag.addEventListener('click', () => {
+      state.player.bag.sort((a, b) => ((RARITY[b.rarity]?.rank || 0) - (RARITY[a.rarity]?.rank || 0)) || String(a.slot).localeCompare(String(b.slot)));
+      sfx.loot();
+      renderInventoryUI();
     });
 
+    dom.btnTownPortal.addEventListener('click', () => { sfx.unlock(); sfx.portal(); enterTown(); });
     dom.btnLootFilter.addEventListener('click', () => {
       sfx.unlock();
       const idx = LOOT_FILTER_MODES.indexOf(state.lootFilter);
@@ -2183,23 +3026,14 @@
 
     dom.btnNewFloor.addEventListener('click', () => {
       sfx.unlock();
-      if (state.mode === 'TOWN') {
-        openTownNpcDrawer('waypoint');
-        return;
-      }
+      if (state.mode === 'TOWN') { openTownNpcDrawer('waypoint'); return; }
       const nextFloor = state.stairs.unlocked ? state.floor + 1 : state.floor;
       const nextSeed = Math.floor(1000 + Math.random() * 8999);
       enterDungeonFloor(nextSeed, nextFloor);
     });
 
-    dom.btnRespawn.addEventListener('click', () => {
-      sfx.unlock();
-      respawnAtWaypoint(false);
-    });
-    dom.btnRespawnNew.addEventListener('click', () => {
-      sfx.unlock();
-      respawnAtWaypoint(true);
-    });
+    dom.btnRespawn.addEventListener('click', () => { sfx.unlock(); respawnAtWaypoint(false); });
+    dom.btnRespawnNew.addEventListener('click', () => { sfx.unlock(); respawnAtWaypoint(true); });
   }
 
   function updateJoystickFromPointer(px, py) {
@@ -2260,11 +3094,18 @@
     // Cooldowns & timers
     p.attackCd = Math.max(0, p.attackCd - dt);
     p.potionCd = Math.max(0, p.potionCd - dt);
+    p.dodgeCd = Math.max(0, p.dodgeCd - dt);
+    p.invulnTimer = Math.max(0, p.invulnTimer - dt);
+    p.ultTimer = Math.max(0, p.ultTimer - dt);
     p.attackAnim = Math.max(0, p.attackAnim - dt);
     p.castAnim = Math.max(0, p.castAnim - dt);
     p.hitFlash = Math.max(0, p.hitFlash - dt);
     p.chillTimer = Math.max(0, p.chillTimer - dt);
-    for (const s of [1, 2, 3]) {
+    if (p.bladeOil && p.bladeOil.timer > 0) {
+      p.bladeOil.timer = Math.max(0, p.bladeOil.timer - dt);
+      if (p.bladeOil.timer <= 0) p.bladeOil = null;
+    }
+    for (const s of [1, 2, 3, 4]) {
       p.skillCds[s] = Math.max(0, p.skillCds[s] - dt);
     }
 
@@ -2287,14 +3128,11 @@
       state.pendingLootTarget = null;
     } else if (state.pendingLootTarget) {
       const idx = state.lootDrops.indexOf(state.pendingLootTarget);
-      if (idx === -1) {
-        state.pendingLootTarget = null;
-      } else {
+      if (idx === -1) state.pendingLootTarget = null;
+      else {
         const d = dist(p.x, p.y, state.pendingLootTarget.x, state.pendingLootTarget.y);
-        if (d <= 1.2) {
-          collectLootDrop(idx);
-          state.pendingLootTarget = null;
-        } else {
+        if (d <= 1.2) { collectLootDrop(idx); state.pendingLootTarget = null; }
+        else {
           const isoDir = worldToIso(state.pendingLootTarget.x - p.x, state.pendingLootTarget.y - p.y);
           const il = Math.hypot(isoDir.x, isoDir.y) || 1;
           sx = isoDir.x / il;
@@ -2329,14 +3167,144 @@
 
     if (state.mode === 'TOWN') return;
 
-    // Iron Gates smoothly lift open as hero approaches
+    // Cursed Fog Torch Fuel & Wall Brazier relight
+    if (state.floorCondition === 'cursed_fog') {
+      state.torchFuel = Math.max(15, state.torchFuel - dt * 1.4);
+      for (const tc of state.torches) {
+        if (dist(p.x, p.y, tc.x, tc.y) <= 1.5 && state.torchFuel < 90) {
+          state.torchFuel = 100;
+          addFloatText(p.x, p.y, 'Torch Relit!', '#fde047', false);
+        }
+      }
+    }
+
+    // Abyssal Rift Timer
+    if (state.riftTier > 0 && !state.stairs.unlocked) {
+      state.riftTimer = Math.max(0, state.riftTimer - dt);
+      if (state.riftTimer === 0) {
+        showToast('Abyssal Rift Timer Expired — Boss Enraged!');
+      }
+    }
+
+    // Levers & Iron Gates
+    for (const lv of state.levers) {
+      if (!lv.pulled && dist(p.x, p.y, lv.x, lv.y) <= 1.25) {
+        lv.pulled = true;
+        const g = state.gates[lv.gateIdx];
+        if (g) { g.locked = false; g.isOpen = true; }
+        sfx.anvil();
+        showToast('Portcullis Lever Pulled — Gate Unlocked!');
+      }
+    }
     for (const g of state.gates) {
-      const near = dist(p.x, p.y, g.x, g.y) <= 2.7;
-      if (near && !g.isOpen) g.isOpen = true;
+      if (!g.locked && dist(p.x, p.y, g.x, g.y) <= 2.7 && !g.isOpen) g.isOpen = true;
       if (g.isOpen && g.open < 1) g.open = Math.min(1, g.open + dt * 3.2);
     }
 
-    // Arm Waypoint return-to-town once player steps away from spawn
+    // Color-Coded Rune Plates & Bridges
+    for (const rp of state.runePlates) {
+      if (!rp.active && dist(p.x, p.y, rp.x, rp.y) <= 1.0) {
+        rp.active = true;
+        for (const rb of state.runeBridges) {
+          if (rb.colorId === rp.colorId) rb.unlocked = true;
+        }
+        sfx.holy();
+        showToast(`${rp.colorId.toUpperCase()} Rune Bridge Activated!`);
+      }
+    }
+
+    // Teleportation Mirror Pads
+    for (const mp of state.mirrorPads) {
+      mp.cd = Math.max(0, mp.cd - dt);
+      if (mp.cd <= 0 && dist(p.x, p.y, mp.x, mp.y) <= 0.85) {
+        p.x = mp.tx;
+        p.y = mp.ty;
+        for (const other of state.mirrorPads) other.cd = 3.0;
+        sfx.portal();
+        updateFogOfWar(true);
+        showToast('Teleported via Mirror Pad!');
+        break;
+      }
+    }
+
+    // Traps (harm both player and monsters)
+    for (const tr of state.traps) {
+      tr.timer -= dt;
+      if (tr.timer <= 0) {
+        tr.timer = tr.active ? 2.4 : 0.7;
+        tr.active = !tr.active;
+        if (tr.active) {
+          if (dist(p.x, p.y, tr.x, tr.y) <= 1.1) damagePlayer(Math.round(10 + state.floor * 3));
+          for (let i = state.monsters.length - 1; i >= 0; i--) {
+            const m = state.monsters[i];
+            if (dist(m.x, m.y, tr.x, tr.y) <= 1.2) {
+              damageMonster(m, 14 + state.floor * 4, 0, 0, false, 4);
+              if (tr.kind === 'darts') applyStatus(m, 'poison', 3.0);
+            }
+          }
+        }
+      }
+    }
+
+    // Interactive Room Events (Shrine, Cursed Chest, Blood Obelisk, Invasion Altar, Goblin Peddler)
+    for (const ev of state.events) {
+      if (ev.kind === 'obelisk' && ev.active && !ev.used) {
+        ev.timer -= dt;
+        if (ev.wave < 3 && ev.timer < 20 - ev.wave * 6) {
+          ev.wave += 1;
+          state.monsters.push(createMonster('skeleton', ev.x + 1.5, ev.y, 1 + state.floor * 0.25));
+          state.monsters.push(createMonster('ghoul', ev.x - 1.5, ev.y, 1 + state.floor * 0.25));
+        }
+        if (ev.timer <= 0) {
+          ev.used = true;
+          ev.active = false;
+          spawnLootDrop(ev.x, ev.y, 'elite');
+          advanceBounty('events', 1);
+          showToast('Blood Obelisk Cleansed!');
+        }
+        continue;
+      }
+      if (ev.used || dist(p.x, p.y, ev.x, ev.y) > 1.3) continue;
+      if (ev.kind === 'shrine') {
+        ev.used = true;
+        p.hp = p.maxHp;
+        p.mp = p.maxMp;
+        sfx.holy();
+        advanceBounty('events', 1);
+        showToast('Dungeon Shrine: Vitals Restored!');
+      } else if (ev.kind === 'cursed_chest') {
+        ev.used = true;
+        sfx.loot();
+        spawnLootDrop(ev.x, ev.y, 'elite');
+        state.monsters.push(createMonster('ghoul', ev.x + 1.4, ev.y + 1.0, 1 + state.floor * 0.28));
+        advanceBounty('events', 1);
+        showToast('Cursed Chest Opened — Ambush!');
+      } else if (ev.kind === 'obelisk') {
+        ev.active = true;
+        sfx.portal();
+        showToast('Blood Obelisk Activated — Survive 20s!');
+      } else if (ev.kind === 'invasion') {
+        ev.used = true;
+        state.infamyStreak += 1;
+        state.monsters.push(createMonster('rival', ev.x + 1.6, ev.y - 1.2, 1 + state.floor * 0.3));
+        sfx.fire();
+        advanceBounty('events', 1);
+        showToast(`Invasion Altar! Shadow Rival Appears (Streak ${state.infamyStreak})!`);
+      } else if (ev.kind === 'peddler') {
+        ev.used = true;
+        if (p.gold >= 60) {
+          p.gold -= 60;
+          const item = generateItem(Math.random() < 0.25 ? 'legendary' : Math.random() < 0.5 ? 'set' : 'rare');
+          p.bag.push(item);
+          sfx.legendary();
+          showToast(`Goblin Peddler Mystery Box: ${item.name}!`);
+        } else {
+          showToast('Goblin Peddler wants 60 Gold for a Mystery Box.');
+        }
+      }
+    }
+
+    // Waypoint return-to-town
     const wpDist = dist(p.x, p.y, state.waypoint.x, state.waypoint.y);
     if (!state.waypointArmed && wpDist > 2.6) state.waypointArmed = true;
     else if (state.waypointArmed && wpDist <= 0.95) {
@@ -2346,21 +3314,21 @@
       return;
     }
 
-    // Auto-pickup nearby Gold Coins & Health Potions
+    // Auto-pickup Gold & Potions
     for (let i = state.lootDrops.length - 1; i >= 0; i--) {
       const drop = state.lootDrops[i];
       if (drop.z > 2) continue;
-      if ((drop.kind === 'gold' || drop.kind === 'potion') && dist(p.x, p.y, drop.x, drop.y) <= 1.15) {
+      if ((drop.kind === 'gold' || drop.kind === 'potion' || drop.kind === 'essence') && dist(p.x, p.y, drop.x, drop.y) <= 1.15) {
         collectLootDrop(i);
       }
     }
 
-    // Descent Stairs Transition when unlocked
+    // Descent Stairs
     if (state.stairs.unlocked && dist(p.x, p.y, state.stairs.x, state.stairs.y) <= 1.05) {
       const nextFloor = state.floor + 1;
       state.highestFloor = Math.max(state.highestFloor, nextFloor);
       const nextSeed = Math.floor(1000 + Math.random() * 8999);
-      enterDungeonFloor(nextSeed, nextFloor);
+      enterDungeonFloor(nextSeed, nextFloor, { riftTier: state.riftTier > 0 ? state.riftTier + 1 : 0 });
     }
   }
 
@@ -2372,17 +3340,63 @@
     const p = state.player;
     let activeBoss = null;
 
-    for (let i = 0; i < state.monsters.length; i++) {
+    // Tick Albion-style Boss Ground Telegraphs
+    for (let i = state.bossTelegraphs.length - 1; i >= 0; i--) {
+      const tg = state.bossTelegraphs[i];
+      tg.elapsed += dt;
+      if (tg.elapsed >= tg.dur) {
+        // Detonate telegraph!
+        sfx.fire();
+        state.camera.shake = Math.max(state.camera.shake, 5);
+        const dPlayer = dist(p.x, p.y, tg.x, tg.y);
+        let hit = false;
+        if (tg.kind === 'cone') {
+          if (dPlayer <= tg.r) {
+            const dot = ((p.x - tg.x) / (dPlayer || 1)) * Math.cos(tg.angle) + ((p.y - tg.y) / (dPlayer || 1)) * Math.sin(tg.angle);
+            if (dot >= 0.45) hit = true;
+          }
+        } else if (tg.kind === 'donut') {
+          if (dPlayer >= tg.innerR && dPlayer <= tg.r) hit = true;
+        } else if (tg.kind === 'laser') {
+          const along = Math.abs((p.x - tg.x) * Math.sin(tg.angle) - (p.y - tg.y) * Math.cos(tg.angle));
+          if (dPlayer <= tg.r && along <= 0.9) hit = true;
+        } else if (tg.kind === 'pool') {
+          if (dPlayer <= tg.r) hit = true;
+        }
+        if (hit) damagePlayer(tg.dmg, tg.owner);
+        state.bossTelegraphs.splice(i, 1);
+      }
+    }
+
+    for (let i = state.monsters.length - 1; i >= 0; i--) {
       const m = state.monsters[i];
       m.hitFlash = Math.max(0, m.hitFlash - dt);
       m.stunTimer = Math.max(0, m.stunTimer - dt);
+      m.staggeredTimer = Math.max(0, (m.staggeredTimer || 0) - dt);
       m.atkCd = Math.max(0, m.atkCd - dt);
+
+      // Tick Burn / Poison / Bleed / Chill statuses
+      if (m.statuses) {
+        if (m.statuses.burn > 0) {
+          m.statuses.burn -= dt;
+          if (Math.random() < dt * 2.5) damageMonster(m, Math.max(2, getHeroStats().atk * 0.18), 0, 0, false, 0);
+        }
+        if (m.statuses.poison > 0) {
+          m.statuses.poison -= dt;
+          if (Math.random() < dt * 2.5) damageMonster(m, Math.max(2, getHeroStats().atk * 0.16), 0, 0, false, 0);
+        }
+        if (m.statuses.bleed > 0) {
+          m.statuses.bleed -= dt;
+          if (Math.random() < dt * 2.5) damageMonster(m, Math.max(2, getHeroStats().atk * 0.2), 0, 0, false, 0);
+        }
+        if (m.statuses.chill > 0) m.statuses.chill -= dt;
+      }
+      if (m.hp <= 0) continue;
 
       if (m.affixes && m.affixes.includes('molten') && Math.random() < dt * 4.5) {
         spawnParticles(m.x, m.y, '#f97316', 1, 0.9, 10);
       }
 
-      // Apply knockback decay
       if (Math.hypot(m.vx, m.vy) > 0.05) {
         moveWithSlide(m, m.vx * dt, m.vy * dt, m.radius);
         m.vx *= Math.pow(0.05, dt);
@@ -2393,30 +3407,45 @@
       if (d <= m.aggro) m.engaged = true;
       if (m.type === 'boss' && m.engaged) activeBoss = m;
 
-      if (p.dead || !m.engaged || m.stunTimer > 0) continue;
+      if (p.dead || !m.engaged || m.stunTimer > 0 || m.staggeredTimer > 0) continue;
 
       const nx = (p.x - m.x) / (d || 1);
       const ny = (p.y - m.y) / (d || 1);
       m.facingX = nx;
       m.facingY = ny;
 
-      // Boss telegraphed slam windup
-      if (m.type === 'boss' && m.slamTelegraph > 0) {
-        m.slamTelegraph -= dt;
-        if (m.slamTelegraph <= 0) {
-          state.novaWaves.push({ x: m.x, y: m.y, r: 0.4, maxR: 2.4, color: '#ef4444', life: 0.3, maxLife: 0.3 });
-          state.camera.shake = Math.max(state.camera.shake, 6);
-          if (dist(m.x, m.y, p.x, p.y) <= 2.4) {
-            damagePlayer(Math.round(m.atk * 1.45), m);
-          }
-          m.atkCd = m.atkCdMax;
-        }
+      // Treasure Goblin flees instead of attacking!
+      if (m.type === 'goblin') {
+        moveWithSlide(m, -nx * m.speed * dt, -ny * m.speed * dt, m.radius);
+        m.walkPhase += dt * 12;
         continue;
       }
 
+      // Boss Albion-Style Chained Telegraph Rotation
+      if (m.type === 'boss') {
+        m.bossCastCd -= dt;
+        if (m.bossCastCd <= 0) {
+          const speedScale = m.phase === 2 ? 0.72 : 1.0;
+          m.bossCastCd = 3.1 * speedScale;
+          const step = m.bossComboStep % 4;
+          m.bossComboStep += 1;
+          const ang = Math.atan2(p.y - m.y, p.x - m.x);
+          if (step === 0) {
+            state.bossTelegraphs.push({ kind: 'cone', x: m.x, y: m.y, r: 3.8, angle: ang, elapsed: 0, dur: 1.05 * speedScale, dmg: Math.round(m.atk * 1.5), owner: m });
+          } else if (step === 1) {
+            state.bossTelegraphs.push({ kind: 'donut', x: m.x, y: m.y, innerR: 1.5, r: 4.2, angle: 0, elapsed: 0, dur: 1.2 * speedScale, dmg: Math.round(m.atk * 1.65), owner: m });
+          } else if (step === 2) {
+            state.bossTelegraphs.push({ kind: 'laser', x: m.x, y: m.y, r: 6.5, angle: ang, elapsed: 0, dur: 1.0 * speedScale, dmg: Math.round(m.atk * 1.55), owner: m });
+            state.bossTelegraphs.push({ kind: 'laser', x: m.x, y: m.y, r: 6.5, angle: ang + Math.PI * 0.5, elapsed: 0, dur: 1.0 * speedScale, dmg: Math.round(m.atk * 1.55), owner: m });
+          } else {
+            state.bossTelegraphs.push({ kind: 'pool', x: p.x, y: p.y, r: 2.0, angle: 0, elapsed: 0, dur: 1.0 * speedScale, dmg: Math.round(m.atk * 1.6), owner: m });
+          }
+        }
+      }
+
+      const moveMult = m.statuses && m.statuses.chill > 0 ? 0.65 : 1.0;
       if (d > m.range) {
-        let sepX = 0;
-        let sepY = 0;
+        let sepX = 0, sepY = 0;
         for (let j = 0; j < state.monsters.length; j++) {
           if (i === j) continue;
           const o = state.monsters[j];
@@ -2427,27 +3456,24 @@
             sepY += ((m.y - o.y) / od) * (minD - od) * 2.2;
           }
         }
-        moveWithSlide(m, (nx * m.speed + sepX) * dt, (ny * m.speed + sepY) * dt, m.radius);
+        moveWithSlide(m, (nx * m.speed * moveMult + sepX) * dt, (ny * m.speed * moveMult + sepY) * dt, m.radius);
         m.walkPhase += dt * 8;
       } else if (m.atkCd <= 0) {
-        if (m.type === 'boss' && Math.random() < 0.4) {
-          m.slamTelegraph = 0.65;
-        } else {
-          m.atkCd = m.atkCdMax;
-          damagePlayer(m.atk, m);
-        }
+        m.atkCd = m.atkCdMax;
+        damagePlayer(m.atk, m);
       }
     }
 
-    // Toggle Boss Bar
     if (activeBoss) {
       dom.bossBar.classList.remove('hidden');
-      const affStr = activeBoss.affixes?.length
-        ? ` [${activeBoss.affixes.map((a) => ELITE_AFFIXES[a]?.label || a).join(' • ')}]`
-        : '';
+      const affStr = activeBoss.affixes?.length ? ` [${activeBoss.affixes.map((a) => ELITE_AFFIXES[a]?.label || a).join(' • ')}]` : '';
       dom.bossName.textContent = activeBoss.name + affStr;
       dom.bossHpText.textContent = `${Math.max(0, activeBoss.hp)} / ${activeBoss.maxHp}`;
       dom.bossHpFill.style.width = `${clamp((activeBoss.hp / activeBoss.maxHp) * 100, 0, 100)}%`;
+      dom.bossStaggerFill.style.width = `${clamp((activeBoss.stagger / (activeBoss.maxStagger || 100)) * 100, 0, 100)}%`;
+      const phaseTxt = activeBoss.staggeredTimer > 0 ? 'STAGGERED!' : state.crystals.length > 0 ? 'SHIELDED (DESTROY CRYSTALS)' : (activeBoss.phase === 2 ? 'PHASE 2' : '');
+      dom.bossPhaseBadge.textContent = phaseTxt;
+      dom.bossPhaseBadge.classList.toggle('hidden', !phaseTxt);
     } else {
       dom.bossBar.classList.add('hidden');
     }
@@ -2455,9 +3481,9 @@
 
   function damagePlayer(rawDmg, attacker = null) {
     const p = state.player;
-    if (p.dead || state.mode === 'TOWN') return;
+    if (p.dead || state.mode === 'TOWN' || p.invulnTimer > 0) return;
     const stats = getHeroStats();
-    const mitigated = Math.max(2, Math.round(rawDmg - stats.arm * 0.45));
+    let mitigated = Math.max(2, Math.round((rawDmg - stats.arm * 0.45) * (1 - stats.dr)));
     p.hp = Math.max(0, p.hp - mitigated);
     p.hitFlash = 0.16;
     state.camera.shake = Math.max(state.camera.shake, 3.5);
@@ -2470,16 +3496,16 @@
         attacker.hp = Math.min(attacker.maxHp, attacker.hp + leach);
         addFloatText(attacker.x, attacker.y, `+${leach}`, '#f43f5e', false);
       }
-      if (attacker.affixes.includes('frozen')) {
-        p.chillTimer = 2.0;
-      }
+      if (attacker.affixes.includes('frozen')) p.chillTimer = 2.0;
     }
 
     if (p.hp <= 0) {
       p.dead = true;
+      p.durability = Math.max(0, p.durability - 15);
       const clsName = HERO_CLASSES[state.heroClass]?.name || 'Hero';
-      dom.deathSummary.textContent = `${state.heroName} slain on Floor ${state.floor} • Lv ${p.level} ${clsName} (${p.kills} vanquished).`;
+      dom.deathSummary.textContent = `${state.heroName} slain on Floor ${state.floor} • Lv ${p.level} ${clsName} (-15% Durability).`;
       dom.deathOverlay.classList.remove('hidden');
+      saveHeroProfile();
     }
     updateHud();
   }
@@ -2487,30 +3513,48 @@
   function updateEffectsAndLoot(dt) {
     const p = state.player;
 
-    // Projectiles (Fireball, Shadow Bolt, Frost Orb, Rogue Bolts)
     for (let i = state.projectiles.length - 1; i >= 0; i--) {
       const pr = state.projectiles[i];
       pr.life -= dt;
       pr.x += pr.vx * dt;
       pr.y += pr.vy * dt;
       if (Math.random() < 0.5) {
-        const pCol = pr.kind === 'frost' ? '#38bdf8' : pr.kind === 'shadow' ? '#c084fc' : pr.kind === 'bolt' ? '#4ade80' : '#f97316';
+        const pCol = pr.kind === 'frost' ? '#38bdf8' : pr.kind === 'shadow' || pr.kind === 'soul' ? '#c084fc' : pr.kind === 'bolt' || pr.kind === 'pierce' ? '#4ade80' : '#f97316';
         spawnParticles(pr.x, pr.y, pCol, 1, 0.7, 18);
       }
 
       let hit = !isPositionClear(pr.x, pr.y, 0.16) || pr.life <= 0;
       if (!hit) {
+        for (let c = state.crystals.length - 1; c >= 0; c--) {
+          const cr = state.crystals[c];
+          if (dist(pr.x, pr.y, cr.x, cr.y) <= 0.6) {
+            cr.hp -= pr.dmg;
+            hit = true;
+            if (cr.hp <= 0) state.crystals.splice(c, 1);
+            break;
+          }
+        }
+      }
+      if (!hit) {
         for (const m of state.monsters) {
           if (dist(pr.x, pr.y, m.x, m.y) <= m.radius + 0.35) {
-            hit = true;
-            break;
+            if (pr.pierce) {
+              if (!pr.hitIds) pr.hitIds = new Set();
+              if (!pr.hitIds.has(m.id)) {
+                pr.hitIds.add(m.id);
+                damageMonster(m, pr.dmg, 0, 0, true, pr.stagger || 8);
+              }
+            } else {
+              hit = true;
+              break;
+            }
           }
         }
       }
 
       if (hit) {
         const aoeR = pr.aoe || 2.0;
-        const wCol = pr.kind === 'frost' ? '#38bdf8' : pr.kind === 'shadow' ? '#c084fc' : pr.kind === 'bolt' ? '#4ade80' : '#f97316';
+        const wCol = pr.kind === 'frost' ? '#38bdf8' : pr.kind === 'shadow' || pr.kind === 'soul' ? '#c084fc' : pr.kind === 'bolt' || pr.kind === 'pierce' ? '#4ade80' : '#f97316';
         state.novaWaves.push({ x: pr.x, y: pr.y, r: 0.25, maxR: aoeR, color: wCol, life: 0.22, maxLife: 0.22 });
         spawnParticles(pr.x, pr.y, wCol, 10, 3.0, 16);
         if (aoeR >= 1.5) state.camera.shake = Math.max(state.camera.shake, 3.5);
@@ -2519,7 +3563,9 @@
           const d = dist(pr.x, pr.y, m.x, m.y);
           if (d <= aoeR + m.radius) {
             if (pr.kind === 'frost') m.stunTimer = Math.max(m.stunTimer, 0.95);
-            damageMonster(m, pr.dmg, (m.x - pr.x) / (d || 1), (m.y - pr.y) / (d || 1), true);
+            if (pr.status) applyStatus(m, pr.status, 3.5);
+            if (pr.restoreMana) p.mp = Math.min(p.maxMp, p.mp + pr.restoreMana);
+            damageMonster(m, pr.dmg, (m.x - pr.x) / (d || 1), (m.y - pr.y) / (d || 1), true, pr.stagger || 8);
           }
         }
         breakNearbyProps(pr.x, pr.y, aoeR);
@@ -2527,7 +3573,6 @@
       }
     }
 
-    // Rogue Poison Trap Clouds
     for (let i = state.poisonClouds.length - 1; i >= 0; i--) {
       const pc = state.poisonClouds[i];
       pc.life -= dt;
@@ -2537,14 +3582,15 @@
         for (let j = state.monsters.length - 1; j >= 0; j--) {
           const m = state.monsters[j];
           if (dist(pc.x, pc.y, m.x, m.y) <= pc.r + m.radius) {
-            damageMonster(m, pc.dmg, 0, 0, false);
+            if (pc.status) applyStatus(m, pc.status, 3.0);
+            damageMonster(m, pc.dmg, 0, 0, false, 4);
           }
         }
       }
       if (pc.life <= 0) state.poisonClouds.splice(i, 1);
     }
 
-    // Loot Drop parabolic bounce + Auto-Loot Gold Magnet (within 90px screen distance)
+    // Loot Drop bounce + Auto-Loot Gold Magnet (90px)
     for (let i = state.lootDrops.length - 1; i >= 0; i--) {
       const d = state.lootDrops[i];
       d.age += dt;
@@ -2553,65 +3599,43 @@
         d.y += (d.destY - d.y) * Math.min(1, dt * 6);
         d.z += d.vz * dt;
         d.vz -= 290 * dt;
-        if (d.z <= 0) {
-          d.z = 0;
-          d.vz = 0;
-          d.x = d.destX;
-          d.y = d.destY;
-        }
+        if (d.z <= 0) { d.z = 0; d.vz = 0; d.x = d.destX; d.y = d.destY; }
       } else if (d.kind === 'gold' && !p.dead) {
-        const dx = p.x - d.x;
-        const dy = p.y - d.y;
-        const isoDx = (dx - dy) * (TILE_W * 0.5);
-        const isoDy = (dx + dy) * (TILE_H * 0.5);
-        const pxDist = Math.hypot(isoDx, isoDy);
+        const dx = p.x - d.x, dy = p.y - d.y;
+        const pxDist = Math.hypot((dx - dy) * (TILE_W * 0.5), (dx + dy) * (TILE_H * 0.5));
         if (pxDist <= 90) {
           const wDist = Math.hypot(dx, dy) || 1;
           const pull = Math.min(wDist, 9.5 * dt);
           d.x += (dx / wDist) * pull;
           d.y += (dy / wDist) * pull;
-          d.destX = d.x;
-          d.destY = d.y;
+          d.destX = d.x; d.destY = d.y;
           if (wDist <= 0.65) collectLootDrop(i);
         }
       }
     }
 
-    // Particles
     for (let i = state.particles.length - 1; i >= 0; i--) {
       const pt = state.particles[i];
       pt.life -= dt;
-      if (pt.life <= 0) {
-        state.particles.splice(i, 1);
-        continue;
-      }
-      pt.x += pt.vx * dt;
-      pt.y += pt.vy * dt;
-      pt.z = Math.max(0, pt.z + pt.vz * dt);
-      pt.vz -= 160 * dt;
+      if (pt.life <= 0) { state.particles.splice(i, 1); continue; }
+      pt.x += pt.vx * dt; pt.y += pt.vy * dt;
+      pt.z = Math.max(0, pt.z + pt.vz * dt); pt.vz -= 160 * dt;
     }
-
-    // Slash arcs & nova waves
     for (let i = state.slashArcs.length - 1; i >= 0; i--) {
       state.slashArcs[i].life -= dt;
       if (state.slashArcs[i].life <= 0) state.slashArcs.splice(i, 1);
     }
     for (let i = state.novaWaves.length - 1; i >= 0; i--) {
       const w = state.novaWaves[i];
-      w.life -= dt;
-      w.r = w.maxR * (1 - w.life / w.maxLife);
+      w.life -= dt; w.r = w.maxR * (1 - w.life / w.maxLife);
       if (w.life <= 0) state.novaWaves.splice(i, 1);
     }
-
-    // Floating combat text
     for (let i = state.floatTexts.length - 1; i >= 0; i--) {
       const f = state.floatTexts[i];
-      f.life -= dt;
-      f.z += f.vy * dt;
+      f.life -= dt; f.z += f.vy * dt;
       if (f.life <= 0) state.floatTexts.splice(i, 1);
     }
 
-    // Camera smooth follow + shake decay
     const targetIso = worldToIso(state.player.x, state.player.y);
     state.camera.x += (targetIso.x - state.camera.x) * Math.min(1, dt * 9);
     state.camera.y += (targetIso.y - state.camera.y) * Math.min(1, dt * 9);
@@ -2648,7 +3672,10 @@
     const viewH = canvas.clientHeight;
     if (!viewW || !viewH) return;
 
-    ctx.fillStyle = '#07080c';
+    const biomeDef = BIOMES[state.biome] || BIOMES.crypt;
+    const biomeSprites = atlas.biomes[state.biome] || { floors: atlas.floors, wall: atlas.wall };
+
+    ctx.fillStyle = biomeDef.fog;
     ctx.fillRect(0, 0, viewW, viewH);
 
     const shakeX = state.camera.shake > 0.05 ? (Math.random() - 0.5) * state.camera.shake * 2 : 0;
@@ -2666,7 +3693,7 @@
     const minTileY = Math.max(0, Math.floor(Math.min(c1.y, c2.y, c3.y, c4.y)) - 2);
     const maxTileY = Math.min(MAP_H - 1, Math.ceil(Math.max(c1.y, c2.y, c3.y, c4.y)) + 2);
 
-    // Pass 1: Explored Ground Tiles (Culled)
+    // Pass 1: Explored Ground Tiles (Culled + Biome Tinted)
     for (let y = minTileY; y <= maxTileY; y++) {
       const rowExp = state.explored[y];
       const rowGrid = state.grid[y];
@@ -2686,7 +3713,7 @@
           ? atlas.sanctum
           : t === TILE.BOSS_FLOOR
             ? atlas.bossFloor
-            : atlas.floors[rowVar[x] % atlas.floors.length];
+            : biomeSprites.floors[rowVar[x] % biomeSprites.floors.length];
 
         ctx.drawImage(sprite, sx - TILE_W * 0.5 - 1, sy - TILE_H * 0.5 - 1);
         if (exp === 1) {
@@ -2697,7 +3724,7 @@
       }
     }
 
-    // Pass 1b: Pre-rendered Ground Light Pools (zero per-frame gradient allocations)
+    // Pass 1b: Pre-rendered Ground Light Pools
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     for (let i = 0; i < state.torches.length; i++) {
@@ -2717,6 +3744,64 @@
     ctx.restore();
 
     drawWaypointAndStairs(offX, offY, now);
+
+    // Rune Plates, Bridges, Mirror Pads, Traps & Albion Boss Telegraphs
+    for (const rp of state.runePlates) {
+      if (!state.explored[Math.floor(rp.y)]?.[Math.floor(rp.x)]) continue;
+      const iso = worldToIso(rp.x, rp.y);
+      ctx.fillStyle = rp.active ? rp.color : 'rgba(30,41,59,0.85)';
+      ctx.strokeStyle = rp.color;
+      ctx.lineWidth = 2;
+      drawIsoDiamondPath(ctx, iso.x + offX, iso.y + offY, 26, 13);
+      ctx.fill(); ctx.stroke();
+    }
+    for (const mp of state.mirrorPads) {
+      if (!state.explored[Math.floor(mp.y)]?.[Math.floor(mp.x)]) continue;
+      const iso = worldToIso(mp.x, mp.y);
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(iso.x + offX, iso.y + offY, 18, 9, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    for (const tr of state.traps) {
+      if (!state.explored[Math.floor(tr.y)]?.[Math.floor(tr.x)]) continue;
+      const iso = worldToIso(tr.x, tr.y);
+      ctx.fillStyle = tr.active ? 'rgba(239,68,68,0.6)' : 'rgba(71,85,105,0.45)';
+      drawIsoDiamondPath(ctx, iso.x + offX, iso.y + offY, 28, 14);
+      ctx.fill();
+    }
+    for (const tg of state.bossTelegraphs) {
+      const iso = worldToIso(tg.x, tg.y);
+      const sx = iso.x + offX, sy = iso.y + offY;
+      const pct = clamp(tg.elapsed / tg.dur, 0, 1);
+      ctx.save();
+      ctx.fillStyle = `rgba(239, 68, 68, ${0.14 + pct * 0.25})`;
+      ctx.strokeStyle = '#fb923c';
+      ctx.lineWidth = 2;
+      if (tg.kind === 'donut') {
+        ctx.beginPath();
+        ctx.ellipse(sx, sy, tg.r * 32, tg.r * 16, 0, 0, Math.PI * 2);
+        ctx.fill(); ctx.stroke();
+        ctx.fillStyle = 'rgba(22, 163, 74, 0.25)';
+        ctx.beginPath();
+        ctx.ellipse(sx, sy, tg.innerR * 32, tg.innerR * 16, 0, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (tg.kind === 'laser') {
+        const endIso = worldToIso(tg.x + Math.cos(tg.angle) * tg.r, tg.y + Math.sin(tg.angle) * tg.r);
+        ctx.lineWidth = 10 + pct * 8;
+        ctx.strokeStyle = 'rgba(239, 68, 68, 0.45)';
+        ctx.beginPath(); ctx.moveTo(sx, sy - 8); ctx.lineTo(endIso.x + offX, endIso.y + offY - 8); ctx.stroke();
+      } else {
+        ctx.beginPath();
+        ctx.ellipse(sx, sy, tg.r * 32, tg.r * 16, 0, 0, Math.PI * 2);
+        ctx.fill(); ctx.stroke();
+        ctx.beginPath();
+        ctx.ellipse(sx, sy, tg.r * 32 * pct, tg.r * 16 * pct, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
 
     // Poison Trap Clouds (Rogue)
     for (let i = 0; i < state.poisonClouds.length; i++) {
@@ -2824,6 +3909,47 @@
       pushDraw(m.x + m.y, 6, iso.x + offX, iso.y + offY, m, 0);
     }
 
+    for (let i = 0; i < state.levers.length; i++) {
+      const lv = state.levers[i];
+      if (lv.x < minTileX || lv.x > maxTileX || lv.y < minTileY || lv.y > maxTileY) continue;
+      if (!state.explored[Math.floor(lv.y)]?.[Math.floor(lv.x)]) continue;
+      const iso = worldToIso(lv.x, lv.y);
+      pushDraw(lv.x + lv.y, 9, iso.x + offX, iso.y + offY, lv, 0);
+    }
+
+    for (let i = 0; i < state.events.length; i++) {
+      const ev = state.events[i];
+      if (ev.x < minTileX || ev.x > maxTileX || ev.y < minTileY || ev.y > maxTileY) continue;
+      if (!state.explored[Math.floor(ev.y)]?.[Math.floor(ev.x)]) continue;
+      const iso = worldToIso(ev.x, ev.y);
+      pushDraw(ev.x + ev.y, 10, iso.x + offX, iso.y + offY, ev, 0);
+    }
+
+    for (let i = 0; i < state.crystals.length; i++) {
+      const cr = state.crystals[i];
+      const iso = worldToIso(cr.x, cr.y);
+      pushDraw(cr.x + cr.y, 11, iso.x + offX, iso.y + offY, cr, 0);
+    }
+
+    for (let i = 0; i < state.minions.length; i++) {
+      const mn = state.minions[i];
+      const iso = worldToIso(mn.x, mn.y);
+      pushDraw(mn.x + mn.y, 12, iso.x + offX, iso.y + offY, mn, 0);
+    }
+
+    if (state.petEntity) {
+      const pe = state.petEntity;
+      const iso = worldToIso(pe.x, pe.y);
+      pushDraw(pe.x + pe.y, 13, iso.x + offX, iso.y + offY, pe, 0);
+    }
+
+    if (window.CryptCoop && window.CryptCoop.active) {
+      for (const peer of window.CryptCoop.peers.values()) {
+        const iso = worldToIso(peer.x, peer.y);
+        pushDraw(peer.x + peer.y, 14, iso.x + offX, iso.y + offY, peer, 0);
+      }
+    }
+
     const pIso = worldToIso(state.player.x, state.player.y);
     pushDraw(state.player.x + state.player.y, 7, pIso.x + offX, pIso.y + offY, null, 0);
 
@@ -2833,7 +3959,7 @@
       const it = drawPool[i];
       switch (it.kind) {
         case 1:
-          ctx.drawImage(atlas.wall, it.sx - TILE_W * 0.5 - 1, it.sy - TILE_H * 0.5 - WALL_H - 1);
+          ctx.drawImage(biomeSprites.wall, it.sx - TILE_W * 0.5 - 1, it.sy - TILE_H * 0.5 - WALL_H - 1);
           if (it.extra === 1) {
             ctx.fillStyle = 'rgba(4, 5, 9, 0.45)';
             ctx.fillRect(it.sx - TILE_W * 0.5, it.sy - TILE_H * 0.5 - WALL_H, TILE_W, TILE_H + WALL_H);
@@ -2846,6 +3972,46 @@
         case 6: drawMonster(it.sx, it.sy, it.ref, now); break;
         case 7: drawPaladin(it.sx, it.sy, now); break;
         case 8: drawTownNpc(it.sx, it.sy, it.ref, now); break;
+        case 9:
+          ctx.fillStyle = it.ref.pulled ? '#4ade80' : '#facc15';
+          ctx.fillRect(it.sx - 3, it.sy - 18, 6, 18);
+          break;
+        case 10:
+          ctx.fillStyle = it.ref.used ? '#475569' : '#c084fc';
+          ctx.beginPath(); ctx.arc(it.sx, it.sy - 16, 8, 0, Math.PI * 2); ctx.fill();
+          ctx.font = '700 9px sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#e2e8f0';
+          ctx.fillText(it.ref.label, it.sx, it.sy - 28);
+          break;
+        case 11:
+          ctx.fillStyle = '#a855f7';
+          ctx.beginPath(); ctx.moveTo(it.sx, it.sy - 34); ctx.lineTo(it.sx + 9, it.sy - 14); ctx.lineTo(it.sx, it.sy); ctx.lineTo(it.sx - 9, it.sy - 14); ctx.closePath(); ctx.fill();
+          break;
+        case 12: {
+          const mn = it.ref;
+          ctx.fillStyle = mn.kind === 'colossus' ? '#e2e8f0' : mn.kind === 'imp' ? '#f97316' : mn.kind === 'clone' ? '#4ade80' : '#94a3b8';
+          const sz = mn.kind === 'colossus' ? 14 : 7;
+          ctx.beginPath(); ctx.arc(it.sx, it.sy - sz - 4, sz, 0, Math.PI * 2); ctx.fill();
+          break;
+        }
+        case 13: {
+          const pe = it.ref;
+          const pCfg = PETS_CONFIG[pe.id] || PETS_CONFIG.hound;
+          const bob = Math.sin(pe.phase) * 2;
+          ctx.fillStyle = pCfg.color;
+          ctx.beginPath(); ctx.arc(it.sx, it.sy - 10 + bob, 6, 0, Math.PI * 2); ctx.fill();
+          if ((state.player.petRanks[pe.id] || 1) >= 3) {
+            ctx.strokeStyle = '#fde047'; ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.arc(it.sx, it.sy - 10 + bob, 9, 0, Math.PI * 2); ctx.stroke();
+          }
+          break;
+        }
+        case 14: {
+          const pr = it.ref;
+          drawPaladin(it.sx, it.sy, now, pr.cls || 'paladin');
+          ctx.font = '700 10px sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#93c5fd';
+          ctx.fillText(pr.name || 'Ally', it.sx, it.sy - 46);
+          break;
+        }
       }
     }
 
@@ -3446,9 +4612,13 @@
     const lvlStr = `Lv ${p.level} ${clsName}`;
     const goldStr = p.gold.toLocaleString();
     const xpPct = `${clamp((p.xp / p.nextXp) * 100, 0, 100).toFixed(1)}%`;
-    const floorStr = state.mode === 'TOWN' ? 'Shadowhaven • Town' : `Floor ${state.floor} • Crypt`;
+    const bName = BIOMES[state.biome]?.name || 'Crypt';
+    const floorStr = state.mode === 'TOWN' ? 'Shadowhaven • Town' : (state.riftTier > 0 ? `Rift T${state.riftTier} • ${bName}` : `Fl ${state.floor} • ${bName}`);
     const seedStr = `#${state.seed} • v${VERSION}`;
     const buffStr = state.activeBuff ? state.activeBuff.label : '';
+    const condStr = state.mode === 'DUNGEON'
+      ? (state.riftTier > 0 ? `⏱ ${Math.ceil(state.riftTimer)}s` : state.floorCondition === 'cursed_fog' ? `🔥 Torch ${Math.round(state.torchFuel)}%` : state.floorCondition !== 'calm' ? state.floorCondition.replace('_', ' ').toUpperCase() : '')
+      : '';
 
     if (force || c.hpPct !== hpPct) { dom.hpOrbFill.style.height = hpPct; c.hpPct = hpPct; }
     if (force || c.mpPct !== mpPct) { dom.mpOrbFill.style.height = mpPct; c.mpPct = mpPct; }
@@ -3459,11 +4629,8 @@
     if (force || c.xpPct !== xpPct) { dom.xpBarFill.style.width = xpPct; c.xpPct = xpPct; }
     if (force || c.floorStr !== floorStr) { dom.floorBadge.textContent = floorStr; c.floorStr = floorStr; }
     if (force || c.seedStr !== seedStr) { dom.seedBadge.textContent = seedStr; c.seedStr = seedStr; }
-    if (force || c.buffStr !== buffStr) {
-      dom.buffBadge.textContent = buffStr;
-      dom.buffBadge.classList.toggle('hidden', !buffStr);
-      c.buffStr = buffStr;
-    }
+    if (force || c.buffStr !== buffStr) { dom.buffBadge.textContent = buffStr; dom.buffBadge.classList.toggle('hidden', !buffStr); c.buffStr = buffStr; }
+    if (force || c.condStr !== condStr) { dom.conditionBadge.textContent = condStr; dom.conditionBadge.classList.toggle('hidden', !condStr); c.condStr = condStr; }
 
     if (force || c.bagLen !== p.bag.length) { dom.lootCountBadge.textContent = p.bag.length; c.bagLen = p.bag.length; }
     if (force || c.potions !== p.potions) { dom.potionCount.textContent = p.potions; c.potions = p.potions; }
@@ -3473,16 +4640,29 @@
     if (force || c.nfLabel !== nfLabel || c.unlocked !== state.stairs.unlocked) {
       dom.newFloorBtnLabel.textContent = nfLabel;
       dom.btnNewFloor.classList.toggle('ready-glow', state.mode === 'DUNGEON' && state.stairs.unlocked);
-      c.nfLabel = nfLabel;
-      c.unlocked = state.stairs.unlocked;
+      c.nfLabel = nfLabel; c.unlocked = state.stairs.unlocked;
     }
 
-    // Skill & potion cooldown sweeps
+    const ultFrac = clamp(p.ultCharge / 100, 0, 1);
+    const ultKey = `${Math.floor(p.ultCharge)}`;
+    if (force || c.ultKey !== ultKey) {
+      dom.btnUltimate.style.setProperty('--ult', ultFrac.toFixed(3));
+      dom.attackUltGlow.style.setProperty('--ult', ultFrac.toFixed(3));
+      dom.btnUltimate.classList.toggle('ult-ready', p.ultCharge >= 100);
+      dom.ultPctText.textContent = p.ultCharge >= 100 ? 'ULT!' : `${ultKey}%`;
+      c.ultKey = ultKey;
+    }
+
+    const stanceTxt = state.minionStance === 'aggressive' ? 'AGGR' : 'GUARD';
+    if (force || c.stanceTxt !== stanceTxt) { dom.minionStanceLabel.textContent = stanceTxt; c.stanceTxt = stanceTxt; }
+    const swapTxt = `SET ${p.activeSwapIdx || 1}`;
+    if (force || c.swapTxt !== swapTxt) { dom.swapLoadoutLabel.textContent = swapTxt; c.swapTxt = swapTxt; }
+
     const skillCfg = getActiveSkillConfig();
-    for (const id of [1, 2, 3]) {
-      const cfg = skillCfg[id];
-      const btn = document.getElementById(cfg.elId);
-      const rem = p.skillCds[id];
+    for (const id of [1, 2, 3, 4]) {
+      const cfg = id === 4 ? getEquippedWeaponSpec() : skillCfg[id];
+      const btn = id === 4 ? dom.btnSkill4 : document.getElementById(cfg.elId);
+      const rem = p.skillCds[id] || 0;
       const frac = rem > 0 ? clamp(rem / cfg.cd, 0, 1) : 0;
       const key = `${frac.toFixed(2)}_${rem > 0 ? rem.toFixed(1) : ''}`;
       if (force || c['cd' + id] !== key) {
@@ -3492,6 +4672,15 @@
         c['cd' + id] = key;
       }
     }
+    const dFrac = p.dodgeCd > 0 ? clamp(p.dodgeCd / 2.0, 0, 1) : 0;
+    const dKey = `${dFrac.toFixed(2)}_${p.dodgeCd > 0 ? p.dodgeCd.toFixed(1) : ''}`;
+    if (force || c.dodgeCd !== dKey) {
+      dom.btnDodge.style.setProperty('--cd', dFrac.toFixed(3));
+      dom.btnDodge.classList.toggle('is-cooldown', p.dodgeCd > 0);
+      dom.btnDodge.querySelector('.cd-text').textContent = p.dodgeCd > 0 ? p.dodgeCd.toFixed(1) : '';
+      c.dodgeCd = dKey;
+    }
+
     const pFrac = p.potionCd > 0 ? clamp(p.potionCd / 1.2, 0, 1) : 0;
     const pKey = `${pFrac.toFixed(2)}_${p.potionCd > 0 ? p.potionCd.toFixed(1) : ''}`;
     if (force || c.potCd !== pKey) {
@@ -3502,38 +4691,81 @@
       dom.btnManaElixir.classList.toggle('is-cooldown', p.potionCd > 0);
       c.potCd = pKey;
     }
+
+    // Co-Op Party Panel
+    if (window.CryptCoop && window.CryptCoop.active && window.CryptCoop.peers.size > 0) {
+      dom.partyPanel.classList.remove('hidden');
+      let pHtml = '';
+      for (const peer of window.CryptCoop.peers.values()) {
+        const pct = clamp(((peer.hp || 0) / (peer.maxHp || 100)) * 100, 0, 100);
+        pHtml += `<div class="party-member-pill"><div>${peer.name} (Lv ${peer.level}) ${peer.downed ? '☠' : ''}</div><div class="party-hp-track"><div class="party-hp-fill" style="width:${pct}%"></div></div></div>`;
+      }
+      if (c.partyHtml !== pHtml) { dom.partyPanel.innerHTML = pHtml; c.partyHtml = pHtml; }
+    } else if (!dom.partyPanel.classList.contains('hidden')) {
+      dom.partyPanel.classList.add('hidden');
+    }
   }
   const updateHud = syncHudDom;
 
   function syncClassSkillLabels() {
     const cls = HERO_CLASSES[state.heroClass] || HERO_CLASSES.paladin;
+    const wSpec = getEquippedWeaponSpec();
     dom.attackLabel.textContent = cls.basicName;
     dom.skill1Cost.textContent = cls.skills[1].mana;
     dom.skill2Cost.textContent = cls.skills[2].mana;
     dom.skill3Cost.textContent = cls.skills[3].mana;
+    dom.skill4Label.textContent = wSpec.skillName.split(' ')[0].slice(0, 5).toUpperCase();
+    dom.skill4Cost.textContent = wSpec.mana;
     dom.btnSkill1.title = `${cls.skills[1].name} (1) — ${cls.skills[1].mana} MP`;
     dom.btnSkill2.title = `${cls.skills[2].name} (2) — ${cls.skills[2].mana} MP`;
     dom.btnSkill3.title = `${cls.skills[3].name} (3) — ${cls.skills[3].mana} MP`;
+    dom.btnSkill4.title = `${wSpec.skillName} (4) — ${wSpec.mana} MP`;
   }
 
   function renderMainMenuSummary() {
-    const hasSave = Boolean(localStorage.getItem(SAVE_KEY) || localStorage.getItem(LEGACY_SAVE_KEY));
-    dom.savedHeroCard.classList.toggle('hidden', !hasSave);
-    if (hasSave) {
-      const clsName = HERO_CLASSES[state.heroClass]?.name || 'Paladin';
-      dom.savedHeroName.textContent = state.heroName;
-      dom.savedHeroClass.textContent = clsName;
-      dom.savedHeroMeta.textContent = `Lv ${state.player.level} • ${state.player.gold.toLocaleString()} Gold • Best Floor ${state.highestFloor}`;
-      dom.btnContinueTown.textContent = 'CONTINUE TO TOWN';
-    } else {
-      dom.btnContinueTown.textContent = 'ENTER TOWN';
+    dom.saveSlotGrid.innerHTML = '';
+    for (let i = 0; i < MAX_SAVE_SLOTS; i++) {
+      const slotData = state.saveSlots[i];
+      const card = document.createElement('div');
+      card.className = 'save-slot-card' + (state.activeSlot === i ? ' active' : '');
+      if (slotData) {
+        const clsName = HERO_CLASSES[slotData.heroClass]?.name || 'Paladin';
+        card.innerHTML = `
+          <div>
+            <div class="slot-meta-title">Slot ${i + 1}: ${slotData.heroName} (${clsName})</div>
+            <div class="slot-meta-sub">Lv ${slotData.level} • ${(slotData.gold || 0).toLocaleString()}g • Floor ${slotData.highestFloor || 1}</div>
+          </div>
+          <button type="button" class="slot-del-btn" aria-label="Delete Slot ${i + 1}">🗑</button>
+        `;
+        card.addEventListener('click', (e) => {
+          if (e.target.closest('.slot-del-btn')) return;
+          state.activeSlot = i;
+          applySlotDataToRuntime(slotData);
+          renderMainMenuSummary();
+        });
+        card.querySelector('.slot-del-btn').addEventListener('click', (e) => {
+          e.stopPropagation();
+          state.saveSlots[i] = null;
+          localStorage.setItem(SAVE_SLOTS_KEY, JSON.stringify(state.saveSlots));
+          renderMainMenuSummary();
+        });
+      } else {
+        card.innerHTML = `<div><div class="slot-meta-title">Slot ${i + 1}: Empty</div><div class="slot-meta-sub">Tap to select slot &amp; Create Hero</div></div>`;
+        card.addEventListener('click', () => {
+          state.activeSlot = i;
+          renderMainMenuSummary();
+        });
+      }
+      dom.saveSlotGrid.appendChild(card);
     }
+    const activeData = state.saveSlots[state.activeSlot];
+    dom.btnContinueTown.textContent = activeData ? `CONTINUE AS ${activeData.heroName.toUpperCase()}` : 'ENTER TOWN (DEFAULT HERO)';
     syncAudioToggleLabels();
   }
 
   function renderClassPortraits() {
     dom.classSelectGrid.innerHTML = '';
-    for (const id of ['paladin', 'rogue', 'sorcerer']) {
+    for (const id of Object.keys(HERO_CLASSES)) {
       const cls = HERO_CLASSES[id];
       const card = document.createElement('button');
       card.type = 'button';
@@ -3553,40 +4785,38 @@
           <div class="stat-chip">VIT<strong>${cls.stats.vit}</strong></div>
         </div>
         <div class="class-skills-list">
-          <span>Kit:</span> ${cls.basicName} • ${cls.skills[1].name} • ${cls.skills[2].name} • ${cls.skills[3].name}
+          <span>Kit:</span> ${cls.basicName} • ${cls.skills[1].name} • ${cls.skills[2].name} • ${cls.skills[3].name}<br>
+          <span>Ult:</span> ${cls.ultName}
         </div>
       `;
-      card.addEventListener('click', () => {
-        sfx.unlock();
-        state.selectedCreateClass = id;
-        renderClassPortraits();
-      });
+      card.addEventListener('click', () => { sfx.unlock(); state.selectedCreateClass = id; renderClassPortraits(); });
       dom.classSelectGrid.appendChild(card);
 
-      // Draw live isometric portrait on the card canvas
       const pCan = card.querySelector('canvas');
       const pCtx = pCan.getContext('2d');
-      pCtx.fillStyle = '#07090e';
-      pCtx.fillRect(0, 0, 96, 96);
+      pCtx.fillStyle = '#07090e'; pCtx.fillRect(0, 0, 96, 96);
       const grad = pCtx.createRadialGradient(48, 48, 4, 48, 48, 46);
-      grad.addColorStop(0, 'rgba(217, 119, 6, 0.25)');
-      grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-      pCtx.fillStyle = grad;
-      pCtx.fillRect(0, 0, 96, 96);
-      pCtx.save();
-      pCtx.translate(48, 72);
-      pCtx.scale(1.35, 1.35);
-      pCtx.fillStyle = cls.cloak;
-      pCtx.fillRect(-8, -26, 16, 20);
-      pCtx.fillStyle = cls.armorColor;
-      pCtx.fillRect(-7, -28, 14, 15);
-      pCtx.fillStyle = cls.trimColor;
-      pCtx.fillRect(-1.5, -26, 3, 11);
-      pCtx.fillStyle = id === 'paladin' ? '#cbd5e1' : cls.cloak;
-      pCtx.fillRect(-6, -39, 12, 11);
-      pCtx.fillStyle = cls.trimColor;
-      pCtx.fillRect(-3, -34, 6, 2);
+      grad.addColorStop(0, 'rgba(217, 119, 6, 0.25)'); grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      pCtx.fillStyle = grad; pCtx.fillRect(0, 0, 96, 96);
+      pCtx.save(); pCtx.translate(48, 72); pCtx.scale(1.35, 1.35);
+      pCtx.fillStyle = cls.cloak; pCtx.fillRect(-8, -26, 16, 20);
+      pCtx.fillStyle = cls.armorColor; pCtx.fillRect(-7, -28, 14, 15);
+      pCtx.fillStyle = cls.trimColor; pCtx.fillRect(-1.5, -26, 3, 11);
+      pCtx.fillStyle = id === 'paladin' ? '#cbd5e1' : cls.cloak; pCtx.fillRect(-6, -39, 12, 11);
+      pCtx.fillStyle = cls.trimColor; pCtx.fillRect(-3, -34, 6, 2);
       pCtx.restore();
+    }
+
+    // Pet selector
+    dom.petSelectGrid.innerHTML = '';
+    for (const pId of Object.keys(PETS_CONFIG)) {
+      const pet = PETS_CONFIG[pId];
+      const pc = document.createElement('button');
+      pc.type = 'button';
+      pc.className = 'class-card' + (state.selectedCreatePet === pId ? ' selected' : '');
+      pc.innerHTML = `<div class="class-card-name" style="color:${pet.color}">${pet.name}</div><div class="class-card-role">${pet.skillName} • ${pet.passiveDesc}</div>`;
+      pc.addEventListener('click', () => { sfx.unlock(); state.selectedCreatePet = pId; renderClassPortraits(); });
+      dom.petSelectGrid.appendChild(pc);
     }
   }
 
@@ -3608,9 +4838,7 @@
 
     if (nextScreen === 'MAIN_MENU') renderMainMenuSummary();
     if (nextScreen === 'CHAR_CREATE') {
-      if (!dom.heroNameInput.value.trim()) {
-        dom.heroNameInput.value = GOTHIC_NAMES[Math.floor(Math.random() * GOTHIC_NAMES.length)];
-      }
+      if (!dom.heroNameInput.value.trim()) dom.heroNameInput.value = GOTHIC_NAMES[Math.floor(Math.random() * GOTHIC_NAMES.length)];
       renderClassPortraits();
     }
     if (inWorld) {
@@ -3622,29 +4850,11 @@
     }
   }
 
-  function createNewHero(rawName, classId) {
+  function createNewHero(rawName, classId, petId = 'hound') {
     const cleanName = (rawName || '').trim().slice(0, 18) || 'Aldric';
-    const cls = HERO_CLASSES[classId] ? classId : 'paladin';
-    state.heroName = cleanName;
-    state.heroClass = cls;
-    state.floor = 1;
-    state.highestFloor = 1;
-    state.seed = Math.floor(1000 + Math.random() * 8999);
-    state.activeBuff = null;
-    const p = state.player;
-    p.level = 1;
-    p.xp = 0;
-    p.nextXp = 100;
-    p.gold = 100;
-    p.potions = 3;
-    p.manaElixirs = 2;
-    p.kills = 0;
-    p.dead = false;
-    p.equipped = createStarterGear(cls);
-    p.bag = [];
-    syncPlayerVitalsBounds();
-    p.hp = p.maxHp;
-    p.mp = p.maxMp;
+    const fresh = createFreshHeroSlotData(cleanName, classId, petId);
+    state.saveSlots[state.activeSlot] = fresh;
+    applySlotDataToRuntime(fresh);
     saveHeroProfile();
     enterTown();
   }
@@ -3654,9 +4864,12 @@
     setScreen('TOWN');
   }
 
-  function enterDungeonFloor(seed, floor) {
-    generateDungeon(seed, floor);
+  function enterDungeonFloor(seed, floor, opts = {}) {
+    generateDungeon(seed, floor, opts);
     setScreen('DUNGEON');
+    if (window.CryptCoop && window.CryptCoop.active && window.CryptCoop.isHost) {
+      window.CryptCoop.syncFloor(state.seed, state.floor, state.biome);
+    }
     saveHeroProfile();
   }
 
@@ -3682,9 +4895,7 @@
     if (!item.name.includes('+')) item.name = `${item.name} +1`;
     else item.name = item.name.replace(/\+\d+$/, `+${item.temper}`);
     for (const k of Object.keys(item.stats)) {
-      item.stats[k] = k === 'crit'
-        ? Math.round((item.stats[k] + 1.2) * 10) / 10
-        : Math.max(1, Math.round(item.stats[k] * 1.18 + 2));
+      item.stats[k] = k === 'crit' ? Math.round((item.stats[k] + 1.2) * 10) / 10 : Math.max(1, Math.round(item.stats[k] * 1.18 + 2));
     }
   }
 
@@ -3695,10 +4906,10 @@
 
     if (npcId === 'blacksmith') {
       dom.townNpcTitle.textContent = 'Blacksmith Forge';
-      dom.townNpcSubtitle.textContent = 'Buy Gear • Temper Equipped • Salvage';
+      dom.townNpcSubtitle.textContent = `Dust: ${p.dust} • Durability: ${p.durability}%`;
       const tabs = document.createElement('div');
       tabs.className = 'npc-tabs';
-      for (const [tid, lbl] of [['buy', 'Buy Gear'], ['temper', 'Temper'], ['salvage', 'Salvage']]) {
+      for (const [tid, lbl] of [['buy', 'Buy'], ['temper', 'Temper'], ['reforge', 'Reforge'], ['repair', 'Repair'], ['salvage', 'Salvage']]) {
         const b = document.createElement('button');
         b.type = 'button';
         b.className = 'npc-tab-btn' + (subTab === tid ? ' active' : '');
@@ -3714,74 +4925,100 @@
         state.blacksmithStock.forEach((entry, idx) => {
           const row = document.createElement('div');
           row.className = 'npc-row';
-          row.innerHTML = `
-            <div class="npc-row-info">
-              <div class="npc-row-title rarity-${entry.item.rarity}">${entry.item.name}</div>
-              <div class="npc-row-sub">${SLOT_LABELS[entry.item.slot]} • ${formatStatsLine(entry.item.stats).map(([k, v, u]) => `${k} +${v}${u}`).join(', ')}</div>
-            </div>
-            <button type="button" class="npc-action-btn" ${p.gold < entry.cost || p.bag.length >= MAX_BAG_SLOTS ? 'disabled' : ''}>${entry.cost}g</button>
-          `;
+          row.innerHTML = `<div class="npc-row-info"><div class="npc-row-title rarity-${entry.item.rarity}">${entry.item.name}</div><div class="npc-row-sub">${SLOT_LABELS[entry.item.slot]} • ${formatStatsLine(entry.item.stats).map(([k, v, u]) => `${k} +${v}${u}`).join(', ')}</div></div><button type="button" class="npc-action-btn" ${p.gold < entry.cost || p.bag.length >= MAX_BAG_SLOTS ? 'disabled' : ''}>${entry.cost}g</button>`;
           row.querySelector('button').addEventListener('click', () => {
             if (p.gold < entry.cost || p.bag.length >= MAX_BAG_SLOTS) return;
-            p.gold -= entry.cost;
-            p.bag.push(entry.item);
-            state.blacksmithStock.splice(idx, 1);
-            sfx.anvil();
-            saveHeroProfile();
-            syncHudDom(true);
-            openTownNpcDrawer('blacksmith', 'buy');
+            p.gold -= entry.cost; p.bag.push(entry.item); state.blacksmithStock.splice(idx, 1);
+            sfx.anvil(); saveHeroProfile(); syncHudDom(true); openTownNpcDrawer('blacksmith', 'buy');
           });
           list.appendChild(row);
         });
       } else if (subTab === 'temper') {
         for (const slot of SLOTS) {
-          const eq = p.equipped[slot];
-          if (!eq) continue;
+          const eq = p.equipped[slot]; if (!eq) continue;
           const cost = 60 + ((eq.temper || 0) * 45) + state.highestFloor * 12;
           const row = document.createElement('div');
           row.className = 'npc-row';
-          row.innerHTML = `
-            <div class="npc-row-info">
-              <div class="npc-row-title rarity-${eq.rarity}">${eq.name}</div>
-              <div class="npc-row-sub">${SLOT_LABELS[slot]} • +18% Stats on Temper</div>
-            </div>
-            <button type="button" class="npc-action-btn" ${p.gold < cost ? 'disabled' : ''}>Temper ${cost}g</button>
-          `;
+          row.innerHTML = `<div class="npc-row-info"><div class="npc-row-title rarity-${eq.rarity}">${eq.name}</div><div class="npc-row-sub">${SLOT_LABELS[slot]} • +18% Stats</div></div><button type="button" class="npc-action-btn" ${p.gold < cost ? 'disabled' : ''}>${cost}g</button>`;
           row.querySelector('button').addEventListener('click', () => {
             if (p.gold < cost) return;
-            p.gold -= cost;
-            temperItem(eq);
-            syncPlayerVitalsBounds();
-            p.hp = p.maxHp;
-            sfx.anvil();
-            saveHeroProfile();
-            syncHudDom(true);
-            openTownNpcDrawer('blacksmith', 'temper');
+            p.gold -= cost; temperItem(eq); syncPlayerVitalsBounds(); p.hp = p.maxHp;
+            sfx.anvil(); saveHeroProfile(); syncHudDom(true); openTownNpcDrawer('blacksmith', 'temper');
           });
           list.appendChild(row);
         }
+      } else if (subTab === 'reforge') {
+        for (const slot of SLOTS) {
+          const eq = p.equipped[slot]; if (!eq || !eq.stats) continue;
+          const row = document.createElement('div');
+          row.className = 'npc-row';
+          row.innerHTML = `<div class="npc-row-info"><div class="npc-row-title rarity-${eq.rarity}">${eq.name}</div><div class="npc-row-sub">Reroll 1 random affix • Cost: 45g + 3 Dust</div></div><button type="button" class="npc-action-btn" ${p.gold < 45 || p.dust < 3 ? 'disabled' : ''}>Reforge</button>`;
+          row.querySelector('button').addEventListener('click', () => {
+            if (p.gold < 45 || p.dust < 3) return;
+            p.gold -= 45; p.dust -= 3;
+            const keys = Object.keys(eq.stats);
+            const rk = keys[Math.floor(Math.random() * keys.length)];
+            if (rk) eq.stats[rk] = Math.max(2, Math.round(eq.stats[rk] * (0.95 + Math.random() * 0.35)));
+            syncPlayerVitalsBounds(); sfx.anvil(); saveHeroProfile(); syncHudDom(true); openTownNpcDrawer('blacksmith', 'reforge');
+          });
+          list.appendChild(row);
+        }
+      } else if (subTab === 'repair') {
+        const repRow = document.createElement('div');
+        repRow.className = 'npc-row';
+        const repCost = Math.max(0, Math.round((100 - p.durability) * 1.5));
+        repRow.innerHTML = `<div class="npc-row-info"><div class="npc-row-title">Repair All Equipped Gear</div><div class="npc-row-sub">Current Durability: ${p.durability}%</div></div><button type="button" class="npc-action-btn" ${p.durability >= 100 || p.gold < repCost ? 'disabled' : ''}>${repCost === 0 ? 'Full' : repCost + 'g'}</button>`;
+        repRow.querySelector('button').addEventListener('click', () => {
+          p.gold -= repCost; p.durability = 100; syncPlayerVitalsBounds(); sfx.anvil(); saveHeroProfile(); openTownNpcDrawer('blacksmith', 'repair');
+        });
+        list.appendChild(repRow);
+        const kitRow = document.createElement('div');
+        kitRow.className = 'npc-row';
+        kitRow.innerHTML = `<div class="npc-row-info"><div class="npc-row-title">Field Repair Kit (+1)</div><div class="npc-row-sub">Carried: ${p.repairKits} • Restores 100% Durability anywhere</div></div><button type="button" class="npc-action-btn" ${p.gold < 45 ? 'disabled' : ''}>45g</button>`;
+        kitRow.querySelector('button').addEventListener('click', () => {
+          if (p.gold < 45) return;
+          p.gold -= 45; p.repairKits += 1; sfx.loot(); saveHeroProfile(); openTownNpcDrawer('blacksmith', 'repair');
+        });
+        list.appendChild(kitRow);
       } else {
+        // SALVAGE TAB WITH PROMINENT "SALVAGE ALL" BUTTON
+        const gearItems = p.bag.filter((it) => it && it.kind !== 'gem');
+        const totalG = gearItems.reduce((acc, it) => acc + salvageGoldValue(it), 0);
+        const totalD = gearItems.length * 2;
+        const salAllBtn = document.createElement('button');
+        salAllBtn.type = 'button';
+        salAllBtn.id = 'btnBlacksmithSalvageAll';
+        salAllBtn.className = 'salvage-all-btn';
+        salAllBtn.disabled = gearItems.length === 0;
+        salAllBtn.textContent = gearItems.length
+          ? `⚒ Salvage All (${gearItems.length} items → +${totalG}g, +${totalD} Dust)`
+          : '⚒ Salvage All (Backpack Empty)';
+        salAllBtn.addEventListener('click', () => {
+          if (!gearItems.length) return;
+          const hasHigh = gearItems.some((it) => it.rarity === 'rare' || it.rarity === 'set' || it.rarity === 'legendary');
+          if (hasHigh && !window.confirm('Backpack contains Rare/Set/Legendary gear. Salvage ALL items?')) return;
+          p.gold += totalG;
+          p.dust += totalD;
+          p.bag = p.bag.filter((it) => it && it.kind === 'gem');
+          sfx.anvil();
+          saveHeroProfile();
+          syncHudDom(true);
+          showToast(`Salvaged ${gearItems.length} items (+${totalG}g, +${totalD} Dust)!`);
+          openTownNpcDrawer('blacksmith', 'salvage');
+        });
+        dom.townNpcBody.appendChild(salAllBtn);
+
         if (!p.bag.length) {
           list.innerHTML = '<div class="compare-empty">Your satchel is empty.</div>';
         } else {
           p.bag.forEach((it, idx) => {
-            const val = salvageGoldValue(it);
+            const val = it.kind === 'gem' ? 15 : salvageGoldValue(it);
             const row = document.createElement('div');
             row.className = 'npc-row';
-            row.innerHTML = `
-              <div class="npc-row-info">
-                <div class="npc-row-title rarity-${it.rarity}">${it.name}</div>
-                <div class="npc-row-sub">${SLOT_LABELS[it.slot]}</div>
-              </div>
-              <button type="button" class="npc-action-btn">+${val}g</button>
-            `;
+            row.innerHTML = `<div class="npc-row-info"><div class="npc-row-title rarity-${it.rarity}">${it.name}</div><div class="npc-row-sub">${it.kind === 'gem' ? it.desc : SLOT_LABELS[it.slot]}</div></div><button type="button" class="npc-action-btn">+${val}g</button>`;
             row.querySelector('button').addEventListener('click', () => {
-              p.gold += val;
-              p.bag.splice(idx, 1);
-              sfx.anvil();
-              saveHeroProfile();
-              syncHudDom(true);
-              openTownNpcDrawer('blacksmith', 'salvage');
+              p.gold += val; p.dust += 2; p.bag.splice(idx, 1);
+              sfx.anvil(); saveHeroProfile(); syncHudDom(true); openTownNpcDrawer('blacksmith', 'salvage');
             });
             list.appendChild(row);
           });
@@ -3790,101 +5027,214 @@
       dom.townNpcBody.appendChild(list);
     } else if (npcId === 'stash') {
       dom.townNpcTitle.textContent = 'Hero Stash Chest';
-      dom.townNpcSubtitle.textContent = `Shared Account Storage (${state.stash.length}/${MAX_STASH_SLOTS})`;
+      dom.townNpcSubtitle.textContent = `Shared Account Storage (${state.account.stash.length}/${MAX_STASH_SLOTS})`;
       const list = document.createElement('div');
       list.className = 'npc-list';
       list.innerHTML = '<div class="section-heading">Stash Items (Tap to Withdraw)</div>';
-      if (!state.stash.length) {
-        list.innerHTML += '<div class="compare-empty">Stash is empty. Deposit items from your satchel below.</div>';
-      } else {
-        state.stash.forEach((it, idx) => {
-          const row = document.createElement('div');
-          row.className = 'npc-row';
-          row.innerHTML = `
-            <div class="npc-row-info">
-              <div class="npc-row-title rarity-${it.rarity}">${it.name}</div>
-              <div class="npc-row-sub">${SLOT_LABELS[it.slot]}</div>
-            </div>
-            <button type="button" class="npc-action-btn" ${p.bag.length >= MAX_BAG_SLOTS ? 'disabled' : ''}>Take</button>
-          `;
-          row.querySelector('button').addEventListener('click', () => {
-            if (p.bag.length >= MAX_BAG_SLOTS) return;
-            p.bag.push(it);
-            state.stash.splice(idx, 1);
-            sfx.loot();
-            saveStash();
-            saveHeroProfile();
-            syncHudDom(true);
-            openTownNpcDrawer('stash');
-          });
-          list.appendChild(row);
+      if (!state.account.stash.length) list.innerHTML += '<div class="compare-empty">Stash is empty.</div>';
+      state.account.stash.forEach((it, idx) => {
+        const row = document.createElement('div');
+        row.className = 'npc-row';
+        row.innerHTML = `<div class="npc-row-info"><div class="npc-row-title rarity-${it.rarity}">${it.name}</div><div class="npc-row-sub">${it.kind === 'gem' ? it.desc : SLOT_LABELS[it.slot]}</div></div><button type="button" class="npc-action-btn" ${p.bag.length >= MAX_BAG_SLOTS ? 'disabled' : ''}>Take</button>`;
+        row.querySelector('button').addEventListener('click', () => {
+          if (p.bag.length >= MAX_BAG_SLOTS) return;
+          p.bag.push(it); state.account.stash.splice(idx, 1); sfx.loot(); saveHeroProfile(); syncHudDom(true); openTownNpcDrawer('stash');
         });
-      }
+        list.appendChild(row);
+      });
       const bagHead = document.createElement('div');
-      bagHead.className = 'section-heading';
-      bagHead.style.marginTop = '10px';
+      bagHead.className = 'section-heading'; bagHead.style.marginTop = '10px';
       bagHead.textContent = `Satchel (${p.bag.length}/${MAX_BAG_SLOTS}) — Tap to Deposit`;
       list.appendChild(bagHead);
       p.bag.forEach((it, idx) => {
         const row = document.createElement('div');
         row.className = 'npc-row';
-        row.innerHTML = `
-          <div class="npc-row-info">
-            <div class="npc-row-title rarity-${it.rarity}">${it.name}</div>
-            <div class="npc-row-sub">${SLOT_LABELS[it.slot]}</div>
-          </div>
-          <button type="button" class="npc-action-btn" ${state.stash.length >= MAX_STASH_SLOTS ? 'disabled' : ''}>Store</button>
-        `;
+        row.innerHTML = `<div class="npc-row-info"><div class="npc-row-title rarity-${it.rarity}">${it.name}</div><div class="npc-row-sub">${it.kind === 'gem' ? it.desc : SLOT_LABELS[it.slot]}</div></div><button type="button" class="npc-action-btn" ${state.account.stash.length >= MAX_STASH_SLOTS ? 'disabled' : ''}>Store</button>`;
         row.querySelector('button').addEventListener('click', () => {
-          if (state.stash.length >= MAX_STASH_SLOTS) return;
-          state.stash.push(it);
-          p.bag.splice(idx, 1);
-          sfx.loot();
-          saveStash();
-          saveHeroProfile();
-          syncHudDom(true);
-          openTownNpcDrawer('stash');
+          if (state.account.stash.length >= MAX_STASH_SLOTS) return;
+          state.account.stash.push(it); p.bag.splice(idx, 1); sfx.loot(); saveHeroProfile(); syncHudDom(true); openTownNpcDrawer('stash');
         });
         list.appendChild(row);
       });
       dom.townNpcBody.appendChild(list);
     } else if (npcId === 'apothecary') {
-      dom.townNpcTitle.textContent = 'Shadowhaven Apothecary';
-      dom.townNpcSubtitle.textContent = 'Potions • Elixirs • 1-Floor Shrine Buffs';
+      dom.townNpcTitle.textContent = 'Alchemist & Apothecary';
+      dom.townNpcSubtitle.textContent = 'Potions • Blade Oils • Shrine Buffs';
       const list = document.createElement('div');
       list.className = 'npc-list';
       const offers = [
-        { title: 'Sanctuary Full Restore', sub: 'Refill Health & Mana to 100%', cost: 0, fn: () => { p.hp = p.maxHp; p.mp = p.maxMp; sfx.holy(); } },
-        { title: 'Health Potion (+1)', sub: `Currently carried: ${p.potions}`, cost: 35, fn: () => { p.potions += 1; sfx.potion(); } },
-        { title: 'Mana Elixir (+1)', sub: `Currently carried: ${p.manaElixirs}`, cost: 40, fn: () => { p.manaElixirs += 1; sfx.potion(); } },
-        { title: 'Shrine of Precision', sub: '1-Floor Buff: +15% Crit Chance', cost: 60, fn: () => { state.activeBuff = { id: 'crit', label: '+15% Crit', crit: 15, speed: 0, gold: 0 }; sfx.holy(); } },
-        { title: 'Shrine of Alacrity', sub: '1-Floor Buff: +20% Move Speed', cost: 50, fn: () => { state.activeBuff = { id: 'speed', label: '+20% Speed', crit: 0, speed: 0.2, gold: 0 }; sfx.holy(); } },
-        { title: 'Shrine of Fortune', sub: '1-Floor Buff: +25% Gold Find', cost: 55, fn: () => { state.activeBuff = { id: 'gold', label: '+25% Gold', crit: 0, speed: 0, gold: 0.25 }; sfx.holy(); } }
+        { title: 'Sanctuary Full Restore', sub: 'Refill Health & Mana 100%', cost: 0, fn: () => { p.hp = p.maxHp; p.mp = p.maxMp; sfx.holy(); } },
+        { title: 'Health Potion (+1)', sub: `Carried: ${p.potions}`, cost: 35, fn: () => { p.potions += 1; sfx.potion(); } },
+        { title: 'Mana Elixir (+1)', sub: `Carried: ${p.manaElixirs}`, cost: 40, fn: () => { p.manaElixirs += 1; sfx.potion(); } },
+        { title: 'Ember Blade Oil (90s)', sub: 'Attacks inflict Burn', cost: 45, fn: () => { p.bladeOil = { type: 'burn', label: 'Burn Oil', timer: 90 }; sfx.potion(); } },
+        { title: 'Venom Blade Oil (90s)', sub: 'Attacks inflict Poison', cost: 45, fn: () => { p.bladeOil = { type: 'poison', label: 'Poison Oil', timer: 90 }; sfx.potion(); } },
+        { title: 'Frost Blade Oil (90s)', sub: 'Attacks inflict Chill/Freeze', cost: 50, fn: () => { p.bladeOil = { type: 'chill', label: 'Frost Oil', timer: 90 }; sfx.potion(); } },
+        { title: 'Shrine of Precision', sub: '1-Floor Buff: +15% Crit', cost: 60, fn: () => { state.activeBuff = { id: 'crit', label: '+15% Crit', crit: 15, speed: 0, gold: 0 }; sfx.holy(); } },
+        { title: 'Shrine of Alacrity', sub: '1-Floor Buff: +20% Move Speed', cost: 50, fn: () => { state.activeBuff = { id: 'speed', label: '+20% Speed', crit: 0, speed: 0.2, gold: 0 }; sfx.holy(); } }
       ];
       for (const off of offers) {
         const row = document.createElement('div');
         row.className = 'npc-row';
-        row.innerHTML = `
-          <div class="npc-row-info">
-            <div class="npc-row-title">${off.title}</div>
-            <div class="npc-row-sub">${off.sub}</div>
-          </div>
-          <button type="button" class="npc-action-btn" ${p.gold < off.cost ? 'disabled' : ''}>${off.cost === 0 ? 'Free' : off.cost + 'g'}</button>
-        `;
+        row.innerHTML = `<div class="npc-row-info"><div class="npc-row-title">${off.title}</div><div class="npc-row-sub">${off.sub}</div></div><button type="button" class="npc-action-btn" ${p.gold < off.cost ? 'disabled' : ''}>${off.cost === 0 ? 'Free' : off.cost + 'g'}</button>`;
         row.querySelector('button').addEventListener('click', () => {
           if (p.gold < off.cost) return;
-          p.gold -= off.cost;
-          off.fn();
-          saveHeroProfile();
-          syncHudDom(true);
-          openTownNpcDrawer('apothecary');
+          p.gold -= off.cost; off.fn(); saveHeroProfile(); syncHudDom(true); openTownNpcDrawer('apothecary');
         });
         list.appendChild(row);
       }
       dom.townNpcBody.appendChild(list);
+    } else if (npcId === 'bounties') {
+      dom.townNpcTitle.textContent = 'Shadowhaven Bounty Board';
+      dom.townNpcSubtitle.textContent = `Mercenary Marks: ${state.account.mercenaryMarks || 0}`;
+      const list = document.createElement('div');
+      list.className = 'npc-list';
+      (state.account.bounties || []).forEach((b, idx) => {
+        const ready = b.prog >= b.target && !b.claimed;
+        const row = document.createElement('div');
+        row.className = 'npc-row';
+        row.innerHTML = `<div class="npc-row-info"><div class="npc-row-title">${b.title} (${b.prog}/${b.target})</div><div class="npc-row-sub">${b.desc} • Reward: ${b.gold}g + ${b.marks} Marks</div></div><button type="button" class="npc-action-btn" ${!ready ? 'disabled' : ''}>${b.claimed ? 'Done' : ready ? 'Claim' : 'Active'}</button>`;
+        row.querySelector('button').addEventListener('click', () => {
+          if (!ready) return;
+          p.gold += b.gold; state.account.mercenaryMarks += b.marks; b.claimed = true;
+          sfx.legendary(); saveHeroProfile(); syncHudDom(true); openTownNpcDrawer('bounties');
+        });
+        list.appendChild(row);
+      });
+      dom.townNpcBody.appendChild(list);
+    } else if (npcId === 'pets') {
+      dom.townNpcTitle.textContent = 'Companion Pet Sanctuary';
+      dom.townNpcSubtitle.textContent = `Monster Essence: ${p.essence} • Active: ${PETS_CONFIG[p.petId]?.name}`;
+      const list = document.createElement('div');
+      list.className = 'npc-list';
+      for (const pId of Object.keys(PETS_CONFIG)) {
+        const cfg = PETS_CONFIG[pId];
+        const rk = p.petRanks[pId] || 1;
+        const isAct = p.petId === pId;
+        const row = document.createElement('div');
+        row.className = 'npc-row';
+        row.innerHTML = `<div class="npc-row-info"><div class="npc-row-title" style="color:${cfg.color}">${cfg.name} (Rank ${rk}/5)</div><div class="npc-row-sub">${cfg.skillName} • ${cfg.passiveDesc}</div></div><div style="display:flex;gap:6px;"><button type="button" class="npc-action-btn">${isAct ? 'Active' : 'Summon'}</button><button type="button" class="npc-action-btn" ${rk >= 5 || p.essence < 2 ? 'disabled' : ''}>Feed (2 Ess)</button></div>`;
+        const btns = row.querySelectorAll('button');
+        btns[0].addEventListener('click', () => { p.petId = pId; spawnCompanionPet(); syncPlayerVitalsBounds(); saveHeroProfile(); openTownNpcDrawer('pets'); });
+        btns[1].addEventListener('click', () => {
+          if (rk >= 5 || p.essence < 2) return;
+          p.essence -= 2; p.petRanks[pId] = rk + 1; syncPlayerVitalsBounds(); sfx.lvl(); saveHeroProfile(); openTownNpcDrawer('pets');
+        });
+        list.appendChild(row);
+      }
+      dom.townNpcBody.appendChild(list);
+    } else if (npcId === 'codex') {
+      dom.townNpcTitle.textContent = 'Bestiary Codex';
+      let totalK = 0; for (const k of Object.values(state.account.bestiary || {})) totalK += k;
+      dom.townNpcSubtitle.textContent = `Account Kill Bonus: +${Math.min(20, Math.floor(totalK / 25))} ATK (${totalK} kills)`;
+      const list = document.createElement('div');
+      list.className = 'npc-list';
+      const entries = Object.entries(state.account.bestiary || {});
+      if (!entries.length) list.innerHTML = '<div class="compare-empty">Slay monsters in the Crypt to record Bestiary entries.</div>';
+      for (const [mName, cnt] of entries) {
+        const row = document.createElement('div');
+        row.className = 'npc-row';
+        row.innerHTML = `<div class="npc-row-info"><div class="npc-row-title">${mName}</div><div class="npc-row-sub">Recorded Kills: ${cnt}</div></div>`;
+        list.appendChild(row);
+      }
+      dom.townNpcBody.appendChild(list);
+    } else if (npcId === 'wardrobe') {
+      dom.townNpcTitle.textContent = 'Cosmetic Wardrobe';
+      dom.townNpcSubtitle.textContent = 'Weapon Trails & Cloak Dyes (Boss Unlocks)';
+      const list = document.createElement('div');
+      list.className = 'npc-list';
+      for (const tr of WARDROBE_ITEMS.trails) {
+        const unl = state.account.wardrobeUnlocked.trails.includes(tr.id);
+        const eq = state.account.equippedTrail === tr.id;
+        const row = document.createElement('div');
+        row.className = 'npc-row';
+        row.innerHTML = `<div class="npc-row-info"><div class="npc-row-title" style="color:${tr.color}">${tr.name} Trail</div><div class="npc-row-sub">${unl ? 'Unlocked' : 'Defeat ' + tr.reqBoss}</div></div><button type="button" class="npc-action-btn" ${!unl ? 'disabled' : ''}>${eq ? 'Equipped' : 'Equip'}</button>`;
+        row.querySelector('button').addEventListener('click', () => { state.account.equippedTrail = tr.id; saveAccount(); openTownNpcDrawer('wardrobe'); });
+        list.appendChild(row);
+      }
+      for (const cp of WARDROBE_ITEMS.capes) {
+        const unl = state.account.wardrobeUnlocked.capes.includes(cp.id);
+        const eq = state.account.equippedCape === cp.id;
+        const row = document.createElement('div');
+        row.className = 'npc-row';
+        row.innerHTML = `<div class="npc-row-info"><div class="npc-row-title">${cp.name} Cape</div><div class="npc-row-sub">${unl ? 'Unlocked' : 'Defeat ' + cp.reqBoss}</div></div><button type="button" class="npc-action-btn" ${!unl ? 'disabled' : ''}>${eq ? 'Equipped' : 'Equip'}</button>`;
+        row.querySelector('button').addEventListener('click', () => { state.account.equippedCape = cp.id; saveAccount(); openTownNpcDrawer('wardrobe'); });
+        list.appendChild(row);
+      }
+      dom.townNpcBody.appendChild(list);
+    } else if (npcId === 'coop') {
+      dom.townNpcTitle.textContent = '4-Player WebRTC Co-Op';
+      dom.townNpcSubtitle.textContent = window.CryptCoop?.active ? `Connected: ${window.CryptCoop.roomCode}` : 'PeerJS + ntfy.sh Zero-Server Co-Op';
+      const wrap = document.createElement('div');
+      wrap.className = 'npc-list';
+      wrap.innerHTML = `
+        <div style="display:flex;gap:8px;">
+          <button id="btnCoopHost" type="button" class="npc-action-btn" style="flex:1">Host New Room</button>
+          <button id="btnCoopRefresh" type="button" class="npc-action-btn">Refresh Rooms</button>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <input id="coopCodeInput" class="gothic-input" type="text" placeholder="CRYPT-XXXX" maxlength="12">
+          <button id="btnCoopJoin" type="button" class="npc-action-btn">Join Code</button>
+        </div>
+        <div id="coopRoomsList" class="npc-list"><div class="compare-empty">Searching active rooms...</div></div>
+      `;
+      dom.townNpcBody.appendChild(wrap);
+      const heroInfo = { name: state.heroName, cls: state.heroClass, level: p.level };
+      wrap.querySelector('#btnCoopHost').addEventListener('click', async () => {
+        try {
+          const seed = Math.floor(1000 + Math.random() * 8999);
+          const res = await window.CryptCoop.hostRoom(heroInfo, seed, state.floor, state.biome);
+          dom.townNpcDrawer.close();
+          enterDungeonFloor(seed, state.floor);
+          showToast(`Hosting Co-Op Room: ${res.code}`);
+        } catch (err) { showToast('Co-Op Host failed (check network)'); }
+      });
+      wrap.querySelector('#btnCoopJoin').addEventListener('click', async () => {
+        try {
+          const code = wrap.querySelector('#coopCodeInput').value;
+          const pkt = await window.CryptCoop.joinRoom(code, heroInfo);
+          dom.townNpcDrawer.close();
+          enterDungeonFloor(pkt.seed, pkt.floor, { biome: pkt.biome });
+          showToast(`Joined ${code}!`);
+        } catch (err) { showToast('Could not join room code'); }
+      });
+      const loadList = async () => {
+        const listEl = wrap.querySelector('#coopRoomsList');
+        const rooms = await window.CryptCoop.listRooms();
+        listEl.innerHTML = rooms.length ? '' : '<div class="compare-empty">No active public rooms right now. Host one!</div>';
+        for (const r of rooms) {
+          const row = document.createElement('div');
+          row.className = 'npc-row';
+          row.innerHTML = `<div class="npc-row-info"><div class="npc-row-title">${r.code} • ${r.hostName}</div><div class="npc-row-sub">Floor ${r.floor} • ${r.players}/4 Players</div></div><button type="button" class="npc-action-btn">Join</button>`;
+          row.querySelector('button').addEventListener('click', async () => {
+            try {
+              const pkt = await window.CryptCoop.joinRoom(r.code, heroInfo);
+              dom.townNpcDrawer.close();
+              enterDungeonFloor(pkt.seed, pkt.floor, { biome: pkt.biome });
+            } catch (_) { showToast('Room unreachable'); }
+          });
+          listEl.appendChild(row);
+        }
+      };
+      wrap.querySelector('#btnCoopRefresh').addEventListener('click', loadList);
+      loadList();
     } else if (npcId === 'waypoint') {
-      dom.townNpcTitle.textContent = 'Waypoint Portal';
-      dom.townNpcSubtitle.textContent = `Select Unlocked Crypt Floor (Best: ${state.highestFloor})`;
+      dom.townNpcTitle.textContent = 'Waypoint Portal & Keystones';
+      dom.townNpcSubtitle.textContent = `Best Floor: ${state.highestFloor} • Best Rift Tier: ${state.account.bestRiftTier || 0}`;
+
+      const ctrl = document.createElement('div');
+      ctrl.className = 'npc-list';
+      ctrl.innerHTML = `
+        <div class="npc-tabs" id="wpSizeTabs">
+          ${Object.values(MAP_SIZES).map((ms) => `<button type="button" data-size="${ms.id}" class="npc-tab-btn ${state.mapSize === ms.id ? 'active' : ''}">${ms.label}</button>`).join('')}
+        </div>
+        <div class="npc-tabs" id="wpBiomeTabs">
+          ${Object.values(BIOMES).map((bm) => `<button type="button" data-biome="${bm.id}" class="npc-tab-btn ${state.biome === bm.id ? 'active' : ''}">${bm.name.split(' ')[0]}</button>`).join('')}
+        </div>
+      `;
+      ctrl.querySelectorAll('[data-size]').forEach((b) => b.addEventListener('click', () => { state.mapSize = b.dataset.size; savePrefs(); openTownNpcDrawer('waypoint'); }));
+      ctrl.querySelectorAll('[data-biome]').forEach((b) => b.addEventListener('click', () => { state.biome = b.dataset.biome; openTownNpcDrawer('waypoint'); }));
+      dom.townNpcBody.appendChild(ctrl);
+
       const grid = document.createElement('div');
       grid.className = 'waypoint-grid';
       for (let fl = 1; fl <= state.highestFloor; fl++) {
@@ -3894,12 +5244,22 @@
         btn.className = 'waypoint-floor-btn' + (isBoss ? ' boss-floor' : '');
         btn.innerHTML = isBoss ? `Floor ${fl}<br><small>★ Guardian</small>` : `Floor ${fl}<br><small>Crypt</small>`;
         btn.addEventListener('click', () => {
-          dom.townNpcDrawer.close();
-          sfx.portal();
-          enterDungeonFloor(Math.floor(1000 + Math.random() * 8999), fl);
+          dom.townNpcDrawer.close(); sfx.portal();
+          enterDungeonFloor(Math.floor(1000 + Math.random() * 8999), fl, { biome: state.biome, mapSize: state.mapSize });
         });
         grid.appendChild(btn);
       }
+      // Endless Abyssal Keystone Rift Button
+      const nextRift = (state.account.bestRiftTier || 0) + 1;
+      const riftBtn = document.createElement('button');
+      riftBtn.type = 'button';
+      riftBtn.className = 'waypoint-floor-btn boss-floor';
+      riftBtn.innerHTML = `Abyssal Rift T${nextRift}<br><small>⏱ 3m Keystone</small>`;
+      riftBtn.addEventListener('click', () => {
+        dom.townNpcDrawer.close(); sfx.portal();
+        enterDungeonFloor(Math.floor(1000 + Math.random() * 8999), state.highestFloor, { biome: state.biome, mapSize: state.mapSize, riftTier: nextRift });
+      });
+      grid.appendChild(riftBtn);
       dom.townNpcBody.appendChild(grid);
     }
 
@@ -3926,11 +5286,128 @@
     return parts;
   }
 
+  function drawItemIcon(can, item) {
+    if (!can || !item) return;
+    const g = can.getContext('2d');
+    g.clearRect(0, 0, 30, 30);
+    if (item.kind === 'gem') {
+      const def = GEM_DEFS[item.gemId] || GEM_DEFS.ruby;
+      g.fillStyle = def.color;
+      g.beginPath(); g.moveTo(15, 4); g.lineTo(24, 15); g.lineTo(15, 26); g.lineTo(6, 15); g.closePath(); g.fill();
+      return;
+    }
+    const col = RARITY[item.rarity]?.color || '#cbd5e1';
+    g.strokeStyle = col; g.fillStyle = col; g.lineWidth = 2;
+    if (item.slot === 'weapon') {
+      g.beginPath(); g.moveTo(7, 23); g.lineTo(23, 7); g.stroke();
+      g.fillRect(10, 17, 6, 3);
+    } else if (item.slot === 'offhand') {
+      g.strokeRect(8, 7, 14, 16);
+    } else if (item.slot === 'helm') {
+      g.beginPath(); g.arc(15, 16, 8, Math.PI, 0); g.lineTo(23, 22); g.lineTo(7, 22); g.closePath(); g.stroke();
+    } else if (item.slot === 'armor') {
+      g.strokeRect(7, 7, 16, 16);
+    } else if (item.slot === 'boots') {
+      g.fillRect(8, 12, 6, 11); g.fillRect(16, 12, 6, 11);
+    } else {
+      g.beginPath(); g.arc(15, 15, 7, 0, Math.PI * 2); g.stroke();
+    }
+  }
+
+  let dragPayload = null;
+  function attachInvDrag(el, source, key, item) {
+    if (!item) return;
+    let startX = 0, startY = 0, dragging = false;
+    el.addEventListener('pointerdown', (e) => {
+      startX = e.clientX; startY = e.clientY; dragging = false;
+      dragPayload = { source, key, item };
+    });
+    el.addEventListener('pointermove', (e) => {
+      if (!dragPayload || dragPayload.key !== key || dragPayload.source !== source) return;
+      if (!dragging && Math.hypot(e.clientX - startX, e.clientY - startY) > 10) {
+        dragging = true;
+        dom.dragGhost.textContent = item.name;
+        dom.dragGhost.classList.remove('hidden');
+      }
+      if (dragging) {
+        dom.dragGhost.style.left = `${e.clientX}px`;
+        dom.dragGhost.style.top = `${e.clientY}px`;
+      }
+    });
+    const finishDrag = (e) => {
+      if (!dragPayload || dragPayload.key !== key || dragPayload.source !== source) return;
+      if (dragging) {
+        dom.dragGhost.classList.add('hidden');
+        const targetEl = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-drop-type]');
+        if (targetEl) handleInvDrop(dragPayload, targetEl.dataset.dropType, targetEl.dataset.dropKey);
+      }
+      dragPayload = null;
+      dragging = false;
+    };
+    el.addEventListener('pointerup', finishDrag);
+    el.addEventListener('pointercancel', finishDrag);
+  }
+
+  function handleInvDrop(drag, dropType, dropKey) {
+    const p = state.player;
+    if (dropType === 'salvage' && drag.source === 'bag') {
+      const val = drag.item.kind === 'gem' ? 15 : salvageGoldValue(drag.item);
+      p.gold += val; p.dust += 2; p.bag.splice(drag.key, 1);
+      sfx.anvil(); saveHeroProfile(); syncHudDom(true); renderInventoryUI();
+      return;
+    }
+    if (dropType === 'equipped' && drag.source === 'bag') {
+      if (drag.item.kind === 'gem') {
+        const eq = p.equipped[dropKey];
+        if (eq && (eq.sockets || 0) > (eq.gems?.length || 0)) {
+          eq.gems = eq.gems || []; eq.gems.push(drag.item.gemId);
+          p.bag.splice(drag.key, 1);
+          sfx.anvil(); syncPlayerVitalsBounds(); saveHeroProfile(); renderInventoryUI();
+          showToast(`Socketed ${drag.item.name}!`);
+        } else { showToast('No open sockets on that slot!'); }
+        return;
+      }
+      if (drag.item.slot === dropKey) {
+        const prev = p.equipped[dropKey];
+        p.equipped[dropKey] = drag.item;
+        if (prev) p.bag[drag.key] = prev; else p.bag.splice(drag.key, 1);
+        sfx.loot(); syncPlayerVitalsBounds(); saveHeroProfile(); syncHudDom(true); renderInventoryUI();
+      }
+      return;
+    }
+    if (dropType === 'bag' && drag.source === 'bag') {
+      const targetIdx = Number(dropKey);
+      const targetItem = p.bag[targetIdx];
+      if (drag.item.kind === 'gem' && targetItem && targetItem.kind !== 'gem' && (targetItem.sockets || 0) > (targetItem.gems?.length || 0)) {
+        targetItem.gems = targetItem.gems || []; targetItem.gems.push(drag.item.gemId);
+        p.bag.splice(drag.key, 1);
+        sfx.anvil(); saveHeroProfile(); renderInventoryUI();
+        return;
+      }
+      const tmp = p.bag[targetIdx];
+      p.bag[targetIdx] = p.bag[drag.key];
+      if (tmp) p.bag[drag.key] = tmp; else p.bag.splice(drag.key, 1);
+      p.bag = p.bag.filter(Boolean);
+      renderInventoryUI();
+    }
+  }
+
   function renderInventoryUI() {
     const p = state.player;
     const totals = getHeroStats();
     dom.invGold.textContent = p.gold.toLocaleString();
+    dom.invDust.textContent = p.dust || 0;
+    dom.invEssence.textContent = p.essence || 0;
     dom.invCapacity.textContent = `${p.bag.length} / ${MAX_BAG_SLOTS}`;
+    dom.spBadge.textContent = p.skillPoints || 0;
+    dom.mpBadge.textContent = p.masteryPoints || 0;
+
+    dom.invTabGear.classList.toggle('active', state.invTab === 'gear');
+    dom.invTabSkills.classList.toggle('active', state.invTab === 'skills');
+    dom.invTabMastery.classList.toggle('active', state.invTab === 'mastery');
+    dom.invGearPanel.classList.toggle('hidden', state.invTab !== 'gear');
+    dom.invSkillsPanel.classList.toggle('hidden', state.invTab !== 'skills');
+    dom.invMasteryPanel.classList.toggle('hidden', state.invTab !== 'mastery');
 
     dom.heroStatsStrip.innerHTML = [
       `<div class="stat-chip"><span>ATK</span>${totals.atk}</div>`,
@@ -3940,28 +5417,77 @@
       `<div class="stat-chip"><span>ARM</span>${Math.round(totals.arm)}</div>`
     ].join('');
 
-    // Equipped Slots
-    dom.equippedSlots.innerHTML = '';
+    if (state.invTab === 'skills') {
+      const cfg = getActiveSkillConfig();
+      dom.invSkillsPanel.innerHTML = `<div class="npc-list">${[1, 2, 3].map((id) => {
+        const rk = p.skillRanks[id] || 1;
+        return `<div class="npc-row"><div class="npc-row-info"><div class="npc-row-title">${cfg[id].name} (Rank ${rk}/5)</div><div class="npc-row-sub">Mana: ${cfg[id].mana} • CD: ${cfg[id].cd}s • +18% Dmg/Rank</div></div><button type="button" class="npc-action-btn" data-rank-skill="${id}" ${rk >= 5 || p.skillPoints < 1 ? 'disabled' : ''}>Upgrade (1 SP)</button></div>`;
+      }).join('')}</div>`;
+      dom.invSkillsPanel.querySelectorAll('[data-rank-skill]').forEach((b) => {
+        b.addEventListener('click', () => {
+          const sid = Number(b.dataset.rankSkill);
+          if (p.skillPoints < 1 || (p.skillRanks[sid] || 1) >= 5) return;
+          p.skillPoints -= 1; p.skillRanks[sid] = (p.skillRanks[sid] || 1) + 1;
+          sfx.lvl(); saveHeroProfile(); renderInventoryUI();
+        });
+      });
+      return;
+    }
+
+    if (state.invTab === 'mastery') {
+      const branches = ['Offense', 'Defense', 'Utility'];
+      dom.invMasteryPanel.innerHTML = `<div class="mastery-wheel-wrap"><div class="mastery-node-grid">${branches.map((br) => `
+        <div class="mastery-branch-card">
+          <div class="section-heading">${br} Constellation</div>
+          ${MASTERY_NODES.filter((n) => n.branch === br).map((n) => {
+            const unl = p.masteryUnlocked.includes(n.id);
+            const can = !unl && p.masteryPoints > 0 && (!n.req || p.masteryUnlocked.includes(n.req));
+            return `<button type="button" class="mastery-node-btn ${unl ? 'unlocked' : ''}" data-mastery="${n.id}" ${!can && !unl ? 'disabled' : ''}><strong>${n.name}</strong><br>${n.desc}</button>`;
+          }).join('')}
+        </div>`).join('')}</div></div>`;
+      dom.invMasteryPanel.querySelectorAll('[data-mastery]').forEach((b) => {
+        b.addEventListener('click', () => {
+          const id = b.dataset.mastery;
+          const node = MASTERY_NODES.find((n) => n.id === id);
+          if (!node || p.masteryUnlocked.includes(id) || p.masteryPoints < 1) return;
+          if (node.req && !p.masteryUnlocked.includes(node.req)) return;
+          p.masteryPoints -= 1; p.masteryUnlocked.push(id);
+          syncPlayerVitalsBounds(); sfx.holy(); saveHeroProfile(); renderInventoryUI();
+        });
+      });
+      return;
+    }
+
+    // Set summary
+    const sets = getSetCounts();
+    const setMsgs = Object.entries(sets).filter(([, c]) => c >= 2).map(([id, c]) => `${SET_DEFS[id].name} (${c}pc)`);
+    dom.setBonusSummary.textContent = setMsgs.join(' • ');
+
+    // Paper-Doll Slots
+    dom.paperDollGrid.innerHTML = '';
     for (const slot of SLOTS) {
       const item = p.equipped[slot];
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'gear-slot';
+      btn.dataset.dropType = 'equipped';
+      btn.dataset.dropKey = slot;
       if (item) btn.dataset.rarity = item.rarity;
-      if (state.selectedInspect?.source === 'equipped' && state.selectedInspect.key === slot) {
-        btn.classList.add('selected');
-      }
-      btn.innerHTML = `
-        <span class="slot-type">${SLOT_LABELS[slot]}</span>
-        <span class="slot-name ${item ? `rarity-${item.rarity}` : ''}">${item ? item.name : 'Empty'}</span>
-      `;
-      btn.addEventListener('click', () => {
-        if (!item) return;
-        state.selectedInspect = { source: 'equipped', key: slot };
-        renderInventoryUI();
-      });
-      dom.equippedSlots.appendChild(btn);
+      if (state.selectedInspect?.source === 'equipped' && state.selectedInspect.key === slot) btn.classList.add('selected');
+      const pips = item && item.sockets ? `<div class="socket-pips">${Array.from({ length: item.sockets }, (_, si) => `<span class="socket-pip ${item.gems?.[si] ? 'filled-' + item.gems[si] : ''}"></span>`).join('')}</div>` : '';
+      btn.innerHTML = `<span class="slot-type">${SLOT_LABELS[slot]}</span><canvas class="item-icon-canvas" width="30" height="30"></canvas><span class="slot-name ${item ? `rarity-${item.rarity}` : ''}">${item ? item.name : 'Empty'}</span>${pips}`;
+      if (item) drawItemIcon(btn.querySelector('canvas'), item);
+      btn.addEventListener('click', () => { if (!item) return; state.selectedInspect = { source: 'equipped', key: slot }; renderInventoryUI(); });
+      attachInvDrag(btn, 'equipped', slot, item);
+      dom.paperDollGrid.appendChild(btn);
     }
+
+    // Weapon Swap Set Strip
+    dom.swapSetStrip.innerHTML = `<span>Swap Set: <strong>${p.swapSet?.weapon ? p.swapSet.weapon.name : 'None'}</strong></span><button id="btnInvSwapNow" type="button" class="compact-toggle-btn">⇄ Swap</button>`;
+    dom.swapSetStrip.querySelector('#btnInvSwapNow').addEventListener('click', () => { swapWeaponLoadout(); renderInventoryUI(); });
+
+    dom.invSalvageDropZone.dataset.dropType = 'salvage';
+    dom.invSalvageDropZone.dataset.dropKey = '1';
 
     // Backpack Grid
     dom.backpackGrid.innerHTML = '';
@@ -3970,21 +5496,17 @@
       const cell = document.createElement('button');
       cell.type = 'button';
       cell.className = 'bag-cell' + (item ? '' : ' empty');
+      cell.dataset.dropType = 'bag';
+      cell.dataset.dropKey = String(i);
       if (item) {
         cell.dataset.rarity = item.rarity;
-        if (state.selectedInspect?.source === 'bag' && state.selectedInspect.key === i) {
-          cell.classList.add('selected');
-        }
-        cell.innerHTML = `
-          <span class="slot-type">${SLOT_LABELS[item.slot]}</span>
-          <span class="slot-name rarity-${item.rarity}">${item.name}</span>
-        `;
-        cell.addEventListener('click', () => {
-          state.selectedInspect = { source: 'bag', key: i };
-          renderInventoryUI();
-        });
+        if (state.selectedInspect?.source === 'bag' && state.selectedInspect.key === i) cell.classList.add('selected');
+        const pips = item.sockets ? `<div class="socket-pips">${Array.from({ length: item.sockets }, (_, si) => `<span class="socket-pip ${item.gems?.[si] ? 'filled-' + item.gems[si] : ''}"></span>`).join('')}</div>` : '';
+        cell.innerHTML = `<canvas class="item-icon-canvas" width="30" height="30"></canvas><span class="slot-name rarity-${item.rarity}">${item.name}</span>${pips}`;
+        drawItemIcon(cell.querySelector('canvas'), item);
+        cell.addEventListener('click', () => { state.selectedInspect = { source: 'bag', key: i }; renderInventoryUI(); });
+        attachInvDrag(cell, 'bag', i, item);
       } else {
-        cell.disabled = true;
         cell.innerHTML = '<span class="slot-type">—</span>';
       }
       dom.backpackGrid.appendChild(cell);
@@ -4001,13 +5523,17 @@
     else if (sel?.source === 'equipped') item = p.equipped[sel.key];
 
     if (!item) {
-      dom.itemComparePanel.innerHTML = '<div class="compare-empty">Tap an item in your satchel or equipped slots to inspect stats and compare upgrades.</div>';
+      dom.itemComparePanel.innerHTML = '<div class="compare-empty">Tap or drag an item to equip, socket gems, compare stats, or salvage.</div>';
+      return;
+    }
+    if (item.kind === 'gem') {
+      dom.itemComparePanel.innerHTML = `<div class="compare-top"><span class="compare-title rarity-rare">${item.name}</span><span class="compare-sub">${item.desc}</span></div><div class="compare-empty">Drag this gem onto a socketed Weapon, Helm, or Armor to socket it!</div>`;
       return;
     }
 
     const equippedItem = p.equipped[item.slot];
-    const statKeys = ['atk', 'crit', 'hp', 'loh', 'arm'];
-    const labels = { atk: 'Attack', crit: 'Crit %', hp: 'Max HP', loh: 'Life on Hit', arm: 'Armor' };
+    const statKeys = ['atk', 'crit', 'hp', 'loh', 'arm', 'spd'];
+    const labels = { atk: 'Attack', crit: 'Crit %', hp: 'Max HP', loh: 'Life on Hit', arm: 'Armor', spd: 'Move %' };
 
     let rowsHtml = '';
     for (const k of statKeys) {
@@ -4017,17 +5543,16 @@
       const diff = Math.round((val - eqVal) * 10) / 10;
       let deltaHtml = '';
       if (sel.source === 'bag') {
-        if (diff > 0) deltaHtml = `<span class="delta-pos">(+${diff})</span>`;
-        else if (diff < 0) deltaHtml = `<span class="delta-neg">(${diff})</span>`;
-        else deltaHtml = '<span class="delta-eq">(=)</span>';
+        deltaHtml = diff > 0 ? `<span class="delta-pos">(+${diff})</span>` : diff < 0 ? `<span class="delta-neg">(${diff})</span>` : '<span class="delta-eq">(=)</span>';
       }
-      rowsHtml += `<div class="affix-row"><span>${labels[k]}: +${val}${k === 'crit' ? '%' : ''}</span>${deltaHtml}</div>`;
+      rowsHtml += `<div class="affix-row"><span>${labels[k]}: +${val}${k === 'crit' || k === 'spd' ? '%' : ''}</span>${deltaHtml}</div>`;
     }
 
     const rarityLabel = RARITY[item.rarity]?.label || 'Common';
     const actionsHtml = sel.source === 'bag'
       ? `<div class="compare-actions">
            <button id="btnEquipItem" class="btn-equip" type="button">Equip ${SLOT_LABELS[item.slot]}</button>
+           ${item.slot === 'weapon' || item.slot === 'offhand' ? '<button id="btnPutSwap" type="button">To Swap Set</button>' : ''}
            <button id="btnSalvageItem" type="button">Salvage (+${salvageGoldValue(item)}g)</button>
          </div>`
       : `<div class="compare-actions"><button id="btnUnequipItem" type="button">Move to Bag</button></div>`;
@@ -4035,7 +5560,7 @@
     dom.itemComparePanel.innerHTML = `
       <div class="compare-top">
         <span class="compare-title rarity-${item.rarity}">${item.name}</span>
-        <span class="compare-sub">${rarityLabel} ${SLOT_LABELS[item.slot]}</span>
+        <span class="compare-sub">${rarityLabel} ${SLOT_LABELS[item.slot]}${item.sockets ? ` • ${item.gems?.length || 0}/${item.sockets} Sockets` : ''}</span>
       </div>
       <div class="compare-affixes">${rowsHtml}</div>
       ${actionsHtml}
@@ -4043,56 +5568,38 @@
 
     if (sel.source === 'bag') {
       document.getElementById('btnEquipItem').addEventListener('click', () => {
-        const idx = sel.key;
-        const chosen = p.bag[idx];
-        if (!chosen) return;
+        const idx = sel.key, chosen = p.bag[idx]; if (!chosen) return;
         const prev = p.equipped[chosen.slot];
         p.equipped[chosen.slot] = chosen;
-        if (prev) p.bag[idx] = prev;
-        else p.bag.splice(idx, 1);
+        if (prev) p.bag[idx] = prev; else p.bag.splice(idx, 1);
         state.selectedInspect = { source: 'equipped', key: chosen.slot };
-        syncPlayerVitalsBounds();
-        sfx.loot();
-        updateHud();
-        renderInventoryUI();
-        saveProgress();
+        syncPlayerVitalsBounds(); syncClassSkillLabels(); sfx.loot(); updateHud(); renderInventoryUI(); saveProgress();
       });
-
+      document.getElementById('btnPutSwap')?.addEventListener('click', () => {
+        const idx = sel.key, chosen = p.bag[idx]; if (!chosen) return;
+        const prev = p.swapSet[chosen.slot];
+        p.swapSet[chosen.slot] = chosen;
+        if (prev) p.bag[idx] = prev; else p.bag.splice(idx, 1);
+        state.selectedInspect = null; sfx.loot(); renderInventoryUI(); saveProgress();
+      });
       document.getElementById('btnSalvageItem').addEventListener('click', () => {
-        const idx = sel.key;
-        const chosen = p.bag[idx];
-        if (!chosen) return;
-        const g = salvageGoldValue(chosen);
-        p.gold += g;
-        p.bag.splice(idx, 1);
-        state.selectedInspect = null;
-        sfx.loot();
-        updateHud();
-        renderInventoryUI();
-        saveProgress();
+        const idx = sel.key, chosen = p.bag[idx]; if (!chosen) return;
+        p.gold += salvageGoldValue(chosen); p.dust += 2; p.bag.splice(idx, 1);
+        state.selectedInspect = null; sfx.anvil(); updateHud(); renderInventoryUI(); saveProgress();
       });
     } else {
       document.getElementById('btnUnequipItem')?.addEventListener('click', () => {
-        if (p.bag.length >= MAX_BAG_SLOTS) {
-          showToast('Satchel full!');
-          return;
-        }
+        if (p.bag.length >= MAX_BAG_SLOTS) { showToast('Satchel full!'); return; }
         const slot = sel.key;
-        p.bag.push(p.equipped[slot]);
-        p.equipped[slot] = null;
-        state.selectedInspect = null;
-        syncPlayerVitalsBounds();
-        updateHud();
-        renderInventoryUI();
-        saveProgress();
+        p.bag.push(p.equipped[slot]); p.equipped[slot] = null;
+        state.selectedInspect = null; syncPlayerVitalsBounds(); updateHud(); renderInventoryUI(); saveProgress();
       });
     }
-
     void formatStatsLine;
   }
 
   function salvageGoldValue(item) {
-    const base = item.rarity === 'legendary' ? 45 : item.rarity === 'rare' ? 22 : item.rarity === 'magic' ? 12 : 6;
+    const base = item.rarity === 'legendary' ? 45 : item.rarity === 'set' ? 36 : item.rarity === 'rare' ? 22 : item.rarity === 'magic' ? 12 : 6;
     return base + (state.floor - 1) * 4;
   }
 
@@ -4120,9 +5627,18 @@
 
     if (state.screen === 'TOWN' || state.screen === 'DUNGEON') {
       updatePlayer(dt);
+      updatePets(dt);
+      updateMinions(dt);
       updateMonsters(dt);
       updateEffectsAndLoot(dt);
       renderIsometricWorld(now);
+
+      if (window.CryptCoop && window.CryptCoop.active) {
+        window.CryptCoop.broadcastState({
+          name: state.heroName, cls: state.heroClass, level: state.player.level,
+          x: state.player.x, y: state.player.y, hp: state.player.hp, maxHp: state.player.maxHp, downed: state.player.dead
+        });
+      }
 
       hudTick += dt;
       if (hudTick >= 0.08) {
@@ -4147,6 +5663,18 @@
     buildTextureAtlas();
     loadProgress();
     setupInputs();
+    if (window.CryptCoop) {
+      window.CryptCoop.onRoomJoined = (pkt) => {
+        if (pkt && pkt.seed) enterDungeonFloor(pkt.seed, pkt.floor || 1, { biome: pkt.biome });
+      };
+      window.CryptCoop.onBossHit = (dmg) => {
+        const boss = state.monsters.find((m) => m.type === 'boss');
+        if (boss) damageMonster(boss, dmg, 0, 0, false, 4);
+      };
+      window.CryptCoop.onRevive = () => {
+        if (state.player.dead) respawnAtWaypoint(false);
+      };
+    }
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
     setScreen('MAIN_MENU');

@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#07080c">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Crypt of Shadows — Isometric ARPG v0.2.0</title>
+  <title>Crypt of Shadows — Isometric ARPG v0.3.0</title>
   <link rel="manifest" href="./manifest.json">
   <link rel="icon" type="image/svg+xml" href="./icon.svg">
   <link rel="stylesheet" href="./style.css">
@@ -26,21 +26,19 @@
             <circle cx="32" cy="25" r="4" fill="#dc2626" stroke="#fde047" stroke-width="1.4"/>
           </svg>
         </div>
-        <div class="menu-version-pill">v0.2.0 • SHADOWHAVEN</div>
+        <div class="menu-version-pill">v0.3.0 • ABYSSAL AWAKENING</div>
         <h1 class="menu-title">CRYPT OF SHADOWS</h1>
         <p class="menu-subtitle">Dark-Gothic Isometric Action RPG</p>
 
-        <div id="savedHeroCard" class="saved-hero-card hidden">
-          <div class="saved-hero-top">
-            <span id="savedHeroName" class="saved-hero-name">Aldric</span>
-            <span id="savedHeroClass" class="saved-hero-class">Paladin</span>
-          </div>
-          <div id="savedHeroMeta" class="saved-hero-meta">Lv 1 • 0 Gold • Best Floor 1</div>
-        </div>
+        <div id="saveSlotGrid" class="save-slot-grid" aria-label="3 Hero Save Slots"></div>
 
         <div class="menu-actions">
           <button id="btnContinueTown" class="gothic-action-btn primary menu-btn-lg" type="button">ENTER TOWN</button>
           <button id="btnOpenCharCreate" class="gothic-action-btn menu-btn-lg" type="button">CREATE NEW HERO</button>
+          <div class="menu-action-split">
+            <button id="btnOpenCoopMenu" class="gothic-action-btn" type="button">🌐 4P Co-Op</button>
+            <button id="btnOpenSaveTransfer" class="gothic-action-btn" type="button">💾 Export / Import</button>
+          </div>
         </div>
 
         <div class="menu-footer-row">
@@ -56,7 +54,7 @@
         <div class="create-header">
           <div>
             <div class="menu-version-pill">FORGE YOUR CHAMPION</div>
-            <h2 class="create-title">Choose Your Path</h2>
+            <h2 class="create-title">Choose Class &amp; Companion</h2>
           </div>
           <button id="btnCharCreateBack" class="iron-btn" type="button" aria-label="Back to Main Menu">Back</button>
         </div>
@@ -68,6 +66,9 @@
         </div>
 
         <div id="classSelectGrid" class="class-select-grid" role="radiogroup" aria-label="Hero Classes"></div>
+
+        <h3 class="section-heading" style="margin: 6px 0 8px;">Starting Companion Pet</h3>
+        <div id="petSelectGrid" class="pet-select-grid" role="radiogroup" aria-label="Companion Pets"></div>
 
         <div class="create-footer">
           <button id="btnForgeHero" class="gothic-action-btn primary menu-btn-lg" type="button">FORGE HERO &amp; ENTER TOWN</button>
@@ -103,21 +104,27 @@
         </div>
         <div class="floor-row">
           <span id="floorBadge" class="floor-badge">Floor 1 • Crypt</span>
-          <span id="seedBadge" class="seed-badge">#1047 • v0.2.0</span>
+          <span id="seedBadge" class="seed-badge">#1047 • v0.3.0</span>
           <span id="buffBadge" class="buff-badge hidden"></span>
+          <span id="conditionBadge" class="condition-badge hidden"></span>
         </div>
       </div>
     </header>
+    <div id="partyPanel" class="party-panel hidden" aria-label="Co-Op Party"></div>
 
     <!-- Top-Center: Boss Bar & Toast Banner -->
     <div id="hudTopCenter">
       <div id="bossBar" class="boss-bar hidden" role="status" aria-live="polite">
         <div class="boss-header">
           <span id="bossName">Horned Demon Brute</span>
+          <span id="bossPhaseBadge" class="boss-phase-badge hidden"></span>
           <span id="bossHpText">0 / 0</span>
         </div>
         <div class="boss-track">
           <div id="bossHpFill" class="boss-fill"></div>
+        </div>
+        <div class="boss-stagger-track" title="Boss Stagger / Break Bar">
+          <div id="bossStaggerFill" class="boss-stagger-fill"></div>
         </div>
       </div>
       <div id="toastBanner" class="toast-banner hidden" role="status" aria-live="polite"></div>
@@ -157,6 +164,9 @@
         <button id="btnLootFilter" class="iron-btn" type="button" aria-label="Cycle Loot Filter" title="Loot Filter (All / Magic+ / Rare+)">
           <span class="btn-label" id="lootFilterLabel">Loot: All</span>
         </button>
+        <button id="btnManualSave" class="iron-btn" type="button" aria-label="Save Game" title="Save Hero Profile Now">
+          <span class="btn-label">Save</span>
+        </button>
         <button id="btnHudAudio" class="iron-btn" type="button" aria-label="Toggle Sound FX" title="Toggle WebAudio SFX">
           <span class="btn-label" id="hudAudioLabel">SFX: ON</span>
         </button>
@@ -167,7 +177,12 @@
     <nav id="townQuickBar" class="town-quick-bar hidden" aria-label="Town Stations">
       <button id="btnTownForge" class="town-dock-btn" type="button">⚒ Forge</button>
       <button id="btnTownStash" class="town-dock-btn" type="button">🧰 Stash</button>
-      <button id="btnTownApothecary" class="town-dock-btn" type="button">⚗ Apothecary</button>
+      <button id="btnTownApothecary" class="town-dock-btn" type="button">⚗ Alchemy</button>
+      <button id="btnTownBounties" class="town-dock-btn" type="button">📜 Bounties</button>
+      <button id="btnTownPets" class="town-dock-btn" type="button">🐾 Pets</button>
+      <button id="btnTownCodex" class="town-dock-btn" type="button">📖 Codex</button>
+      <button id="btnTownWardrobe" class="town-dock-btn" type="button">🧥 Wardrobe</button>
+      <button id="btnTownCoop" class="town-dock-btn" type="button">🌐 Co-Op</button>
       <button id="btnTownWaypoint" class="town-dock-btn primary" type="button">◈ Waypoint</button>
       <button id="btnTownMenu" class="town-dock-btn" type="button">☰ Menu</button>
     </nav>
@@ -183,13 +198,33 @@
 
       <div class="desktop-hints" aria-hidden="true">
         <span>WASD: Move</span>
-        <span>Space / Click: Slash</span>
-        <span>1-3: Skills</span>
-        <span>Q: Potion</span>
+        <span>Space/Click: Attack</span>
+        <span>1-4: Skills</span>
+        <span>F: Ult</span>
+        <span>Shift: Dodge</span>
+        <span>X: Swap</span>
+        <span>G: Stance</span>
         <span>I: Bag</span>
       </div>
 
       <div id="combatCluster" aria-label="Combat Controls">
+        <button id="btnMinionStance" class="skill-btn utility-btn stance-btn" type="button" aria-label="Minion Stance (G)" title="Minion & Pet Stance (G)">
+          <span id="minionStanceLabel" class="util-label">AGGR</span>
+          <span class="key-tag">G</span>
+        </button>
+
+        <button id="btnSwapLoadout" class="skill-btn utility-btn swap-btn" type="button" aria-label="Swap Weapon Set (X)" title="Weapon Loadout Swap (X)">
+          <span id="swapLoadoutLabel" class="util-label">SET 1</span>
+          <span class="key-tag">X</span>
+        </button>
+
+        <button id="btnDodge" class="skill-btn dodge-btn" type="button" aria-label="Dodge Dash (Shift)" title="Dodge / Dash (Shift)">
+          <span class="util-label">DASH</span>
+          <span class="key-tag">⇧</span>
+          <div class="cd-sweep"></div>
+          <span class="cd-text"></span>
+        </button>
+
         <button id="btnManaElixir" class="skill-btn elixir-btn" type="button" aria-label="Drink Mana Elixir (R)" title="Mana Elixir (R)">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" aria-hidden="true">
             <path d="M10 3h4v3l4 5.2A5 5 0 0 1 14.2 20H9.8A5 5 0 0 1 6 11.2L10 6V3z" fill="#2563eb" fill-opacity="0.88" stroke="#bfdbfe" stroke-width="1.6"/>
@@ -213,12 +248,8 @@
         </button>
 
         <button id="btnSkill1" class="skill-btn skill-arc-1" type="button" aria-label="Skill 1 (1)" title="Skill 1 (1)">
-          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#fde68a" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
-            <path d="M12 3a9 9 0 0 1 8.5 6"/>
-            <path d="M21 12a9 9 0 0 1-6 8.5"/>
-            <path d="M12 21a9 9 0 0 1-8.5-6"/>
-            <path d="M3 12a9 9 0 0 1 6-8.5"/>
-            <circle cx="12" cy="12" r="2.5" fill="#facc15"/>
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fde68a" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+            <path d="M12 3a9 9 0 0 1 8.5 6"/><path d="M21 12a9 9 0 0 1-6 8.5"/><path d="M12 21a9 9 0 0 1-8.5-6"/><path d="M3 12a9 9 0 0 1 6-8.5"/><circle cx="12" cy="12" r="2.5" fill="#facc15"/>
           </svg>
           <span id="skill1Cost" class="mana-cost">15</span>
           <span class="key-tag">1</span>
@@ -227,7 +258,7 @@
         </button>
 
         <button id="btnSkill2" class="skill-btn skill-arc-2" type="button" aria-label="Skill 2 (2)" title="Skill 2 (2)">
-          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" aria-hidden="true">
             <path d="M12 2c2.5 3.6 6 6.2 6 11a6 6 0 1 1-12 0c0-3.2 1.8-5.6 3.2-7.4.3 2 1.3 3 2.4 3.2C11.1 6.4 11.4 4.1 12 2z" fill="#f97316" stroke="#fde047" stroke-width="1.4"/>
           </svg>
           <span id="skill2Cost" class="mana-cost">20</span>
@@ -237,9 +268,8 @@
         </button>
 
         <button id="btnSkill3" class="skill-btn skill-arc-3" type="button" aria-label="Skill 3 (3)" title="Skill 3 (3)">
-          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#fef08a" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
-            <path d="M12 2v20M2 12h20M5.5 5.5l13 13M18.5 5.5l-13 13"/>
-            <circle cx="12" cy="12" r="3.5" fill="#facc15"/>
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fef08a" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+            <path d="M12 2v20M2 12h20M5.5 5.5l13 13M18.5 5.5l-13 13"/><circle cx="12" cy="12" r="3.5" fill="#facc15"/>
           </svg>
           <span id="skill3Cost" class="mana-cost">28</span>
           <span class="key-tag">3</span>
@@ -247,12 +277,24 @@
           <span class="cd-text"></span>
         </button>
 
+        <button id="btnSkill4" class="skill-btn skill-arc-4" type="button" aria-label="Weapon Skill (4)" title="Weapon Skill (4)">
+          <span id="skill4Label" class="util-label">WPN</span>
+          <span id="skill4Cost" class="mana-cost">18</span>
+          <span class="key-tag">4</span>
+          <div class="cd-sweep"></div>
+          <span class="cd-text"></span>
+        </button>
+
+        <button id="btnUltimate" class="skill-btn ult-btn" type="button" aria-label="Awakening Ultimate (F)" title="Class Awakening Ultimate (F)">
+          <span class="ult-ring" aria-hidden="true"></span>
+          <span id="ultPctText" class="util-label">0%</span>
+          <span class="key-tag">F</span>
+        </button>
+
         <button id="btnAttack" class="attack-btn" type="button" aria-label="Basic Attack (Space)" title="Basic Attack (Space / Click)">
-          <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="#f8fafc" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M19 3l-8.5 8.5"/>
-            <path d="M19 3l-3.5 1-7 7 2.5 2.5 7-7L19 3z" fill="#cbd5e1" fill-opacity="0.3"/>
-            <path d="M6.5 11.5l6 6"/>
-            <path d="M4 20l4.5-4.5"/>
+          <span id="attackUltGlow" class="attack-ult-ring" aria-hidden="true"></span>
+          <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="#f8fafc" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M19 3l-8.5 8.5"/><path d="M19 3l-3.5 1-7 7 2.5 2.5 7-7L19 3z" fill="#cbd5e1" fill-opacity="0.3"/><path d="M6.5 11.5l6 6"/><path d="M4 20l4.5-4.5"/>
           </svg>
           <span id="attackLabel" class="attack-sub">SLASH</span>
         </button>
@@ -272,37 +314,58 @@
       </div>
     </div>
 
-    <!-- Slide-Up Inventory Drawer -->
+    <!-- Slide-Up Inventory / Skills / Mastery Drawer -->
     <dialog id="inventoryDrawer" aria-labelledby="invTitle">
-      <div class="inv-sheet">
+      <div class="inv-sheet inv-sheet-wide">
         <div class="inv-header">
           <div>
-            <h2 id="invTitle">Paladin Satchel</h2>
+            <h2 id="invTitle">Hero Satchel</h2>
             <div class="inv-sub">
               <span>Gold: <strong id="invGold">0</strong></span>
-              <span id="invCapacity">0 / 20</span>
+              <span>Dust: <strong id="invDust">0</strong></span>
+              <span>Essence: <strong id="invEssence">0</strong></span>
+              <span id="invCapacity">0 / 24</span>
             </div>
           </div>
           <button id="btnCloseInventory" class="iron-btn close-inv-btn" type="button" aria-label="Close Inventory">✕</button>
         </div>
 
+        <div class="npc-tabs inv-tabs-bar">
+          <button id="invTabGear" class="npc-tab-btn active" type="button">Gear &amp; Paper-Doll</button>
+          <button id="invTabSkills" class="npc-tab-btn" type="button">Skills (<span id="spBadge">0</span>)</button>
+          <button id="invTabMastery" class="npc-tab-btn" type="button">Mastery (<span id="mpBadge">0</span>)</button>
+        </div>
+
         <div id="heroStatsStrip" class="stats-strip" aria-label="Hero Combat Totals"></div>
 
-        <div class="inv-body">
-          <section class="inv-section">
-            <h3 class="section-heading">Equipped Gear</h3>
-            <div id="equippedSlots" class="equipped-grid"></div>
-          </section>
+        <div id="invGearPanel" class="inv-body">
+          <div class="paperdoll-layout">
+            <section class="inv-section">
+              <div class="section-head-row">
+                <h3 class="section-heading">Character Paper-Doll</h3>
+                <span id="setBonusSummary" class="set-summary-pill"></span>
+              </div>
+              <div id="paperDollGrid" class="paperdoll-grid"></div>
+              <div id="swapSetStrip" class="swap-set-strip"></div>
+            </section>
+
+            <section class="inv-section">
+              <div class="section-head-row">
+                <h3 class="section-heading">Backpack (Drag or Tap)</h3>
+                <button id="btnSortBag" class="compact-toggle-btn" type="button">⇅ Sort Bag</button>
+              </div>
+              <div id="backpackGrid" class="backpack-grid"></div>
+              <div id="invSalvageDropZone" class="salvage-drop-zone">⚒ Drop Item Here to Salvage</div>
+            </section>
+          </div>
 
           <section id="itemComparePanel" class="compare-panel" aria-live="polite">
-            <div class="compare-empty">Tap an item in your satchel or equipped slots to inspect stats and compare upgrades.</div>
-          </section>
-
-          <section class="inv-section">
-            <h3 class="section-heading">Backpack</h3>
-            <div id="backpackGrid" class="backpack-grid"></div>
+            <div class="compare-empty">Tap or drag an item to equip, socket gems, compare stats, or salvage.</div>
           </section>
         </div>
+
+        <div id="invSkillsPanel" class="inv-body hidden"></div>
+        <div id="invMasteryPanel" class="inv-body hidden"></div>
       </div>
     </dialog>
 
@@ -322,8 +385,31 @@
         <div id="townNpcBody" class="inv-body"></div>
       </div>
     </dialog>
+
+    <!-- Export / Import Save Code Drawer -->
+    <dialog id="saveTransferDrawer" aria-labelledby="saveTransferTitle">
+      <div class="inv-sheet">
+        <div class="inv-header">
+          <div>
+            <h2 id="saveTransferTitle">Save Data Export / Import</h2>
+            <div class="inv-sub"><span>Backup or transfer all 3 hero slots &amp; account stash</span></div>
+          </div>
+          <button id="btnCloseSaveTransfer" class="iron-btn close-inv-btn" type="button" aria-label="Close">✕</button>
+        </div>
+        <div class="inv-body">
+          <textarea id="saveCodeInput" class="save-code-box" rows="5" placeholder="Paste exported save code here to import..."></textarea>
+          <div class="compare-actions" style="margin-top: 10px;">
+            <button id="btnCopySaveCode" class="btn-equip" type="button">📋 Generate &amp; Copy Code</button>
+            <button id="btnImportSaveCode" type="button">📥 Import Code</button>
+          </div>
+        </div>
+      </div>
+    </dialog>
+
+    <div id="dragGhost" class="drag-ghost hidden" aria-hidden="true"></div>
   </div>
 
+  <script src="./multiplayer.js" defer></script>
   <script src="./game.js" defer></script>
 </body>
 </html>
