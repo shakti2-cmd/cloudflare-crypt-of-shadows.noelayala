@@ -4,13 +4,18 @@
   // =========================================================================
   // CONSTANTS & CONFIG
   // =========================================================================
-  const SAVE_KEY = 'crypt_arpg_v010_save';
+  const VERSION = '0.2.0';
+  const SAVE_KEY = 'crypt_arpg_v020_save';
+  const LEGACY_SAVE_KEY = 'crypt_arpg_v010_save';
+  const STASH_KEY = 'crypt_arpg_stash_v020';
+  const PREFS_KEY = 'crypt_arpg_prefs_v020';
   const MAP_W = 42;
   const MAP_H = 42;
   const TILE_W = 64;
   const TILE_H = 32;
   const WALL_H = 52;
   const MAX_BAG_SLOTS = 20;
+  const MAX_STASH_SLOTS = 24;
 
   const TILE = {
     VOID: 0,
@@ -29,22 +34,144 @@
 
   const SLOTS = ['weapon', 'helm', 'armor', 'ring'];
   const SLOT_LABELS = { weapon: 'Weapon', helm: 'Helm', armor: 'Armor', ring: 'Ring' };
+  const LOOT_FILTER_MODES = ['all', 'magic', 'rare'];
+  const LOOT_FILTER_LABELS = { all: 'Loot: All', magic: 'Loot: Magic+', rare: 'Loot: Rare+' };
 
-  const SKILL_CONFIG = {
-    1: { name: 'Whirlwind Cleave', mana: 15, cd: 4.5, elId: 'btnSkill1' },
-    2: { name: 'Fireball',         mana: 20, cd: 3.5, elId: 'btnSkill2' },
-    3: { name: 'Holy Nova',        mana: 28, cd: 7.0, elId: 'btnSkill3' }
+  const HERO_CLASSES = {
+    paladin: {
+      id: 'paladin',
+      name: 'Paladin',
+      role: 'Armored Crusader',
+      stats: { str: 14, dex: 9, int: 8, vit: 15 },
+      baseHp: 115,
+      hpPerLvl: 26,
+      baseMp: 75,
+      mpPerLvl: 8,
+      baseAtk: 11,
+      baseArm: 4,
+      baseCrit: 6,
+      speed: 4.65,
+      cloak: '#7f1d1d',
+      armorColor: '#94a3b8',
+      trimColor: '#facc15',
+      basicName: 'SLASH',
+      skills: {
+        1: { name: 'Whirlwind Cleave', mana: 15, cd: 4.5, elId: 'btnSkill1' },
+        2: { name: 'Fireball',         mana: 20, cd: 3.5, elId: 'btnSkill2' },
+        3: { name: 'Holy Nova',        mana: 28, cd: 7.0, elId: 'btnSkill3' }
+      }
+    },
+    rogue: {
+      id: 'rogue',
+      name: 'Shadow Rogue',
+      role: 'Agile Skirmisher',
+      stats: { str: 9, dex: 16, int: 9, vit: 11 },
+      baseHp: 95,
+      hpPerLvl: 20,
+      baseMp: 85,
+      mpPerLvl: 9,
+      baseAtk: 13,
+      baseArm: 2,
+      baseCrit: 12,
+      speed: 5.25,
+      cloak: '#1e293b',
+      armorColor: '#334155',
+      trimColor: '#4ade80',
+      basicName: 'TWIN',
+      skills: {
+        1: { name: 'Multishot',   mana: 14, cd: 3.2, elId: 'btnSkill1' },
+        2: { name: 'Poison Trap', mana: 18, cd: 5.5, elId: 'btnSkill2' },
+        3: { name: 'Shadow Dash', mana: 20, cd: 4.5, elId: 'btnSkill3' }
+      }
+    },
+    sorcerer: {
+      id: 'sorcerer',
+      name: 'Blood Sorcerer',
+      role: 'Arcane Warlock',
+      stats: { str: 7, dex: 10, int: 17, vit: 11 },
+      baseHp: 90,
+      hpPerLvl: 19,
+      baseMp: 115,
+      mpPerLvl: 13,
+      baseAtk: 14,
+      baseArm: 2,
+      baseCrit: 8,
+      speed: 4.75,
+      cloak: '#4c1d95',
+      armorColor: '#312e81',
+      trimColor: '#c084fc',
+      basicName: 'BOLT',
+      skills: {
+        1: { name: 'Bone Nova',  mana: 16, cd: 4.0, elId: 'btnSkill1' },
+        2: { name: 'Frost Orb',  mana: 22, cd: 3.8, elId: 'btnSkill2' },
+        3: { name: 'Soul Drain', mana: 26, cd: 6.5, elId: 'btnSkill3' }
+      }
+    }
   };
+
+  const GOTHIC_NAMES = [
+    'Aldric', 'Vespera', 'Kaelen', 'Mordecai', 'Seraphina',
+    'Draven', 'Isolde', 'Corvus', 'Valerius', 'Lilith', 'Theron', 'Nyx'
+  ];
+
+  const ELITE_AFFIXES = {
+    vampiric: { id: 'vampiric', label: 'Vampiric', color: '#f43f5e' },
+    molten:   { id: 'molten',   label: 'Molten',   color: '#f97316' },
+    frozen:   { id: 'frozen',   label: 'Frozen',   color: '#38bdf8' },
+    fast:     { id: 'fast',     label: 'Fast',     color: '#facc15' }
+  };
+
+  const FLOOR_GUARDIANS = [
+    'Malakor, Crypt Warden',
+    'Vaelgor, Bone Prelate',
+    'Azrael, Ashen Sovereign',
+    'Nethys, Blood Matriarch'
+  ];
+
+  function getActiveSkillConfig() {
+    const cls = HERO_CLASSES[state.heroClass] || HERO_CLASSES.paladin;
+    return cls.skills;
+  }
 
   // =========================================================================
   // DOM REFERENCES
   // =========================================================================
   const canvas = document.getElementById('gameCanvas');
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { alpha: false });
   const minimapCanvas = document.getElementById('minimapCanvas');
   const mctx = minimapCanvas.getContext('2d');
 
   const dom = {
+    mainMenuScreen: document.getElementById('mainMenuScreen'),
+    savedHeroCard: document.getElementById('savedHeroCard'),
+    savedHeroName: document.getElementById('savedHeroName'),
+    savedHeroClass: document.getElementById('savedHeroClass'),
+    savedHeroMeta: document.getElementById('savedHeroMeta'),
+    btnContinueTown: document.getElementById('btnContinueTown'),
+    btnOpenCharCreate: document.getElementById('btnOpenCharCreate'),
+    btnAudioToggle: document.getElementById('btnAudioToggle'),
+    charCreateScreen: document.getElementById('charCreateScreen'),
+    heroNameInput: document.getElementById('heroNameInput'),
+    btnRandomName: document.getElementById('btnRandomName'),
+    classSelectGrid: document.getElementById('classSelectGrid'),
+    btnCharCreateBack: document.getElementById('btnCharCreateBack'),
+    btnForgeHero: document.getElementById('btnForgeHero'),
+    hudTopLeft: document.getElementById('hudTopLeft'),
+    hudTopRight: document.getElementById('hudTopRight'),
+    touchControls: document.getElementById('touchControls'),
+    combatCluster: document.getElementById('combatCluster'),
+    townQuickBar: document.getElementById('townQuickBar'),
+    btnTownForge: document.getElementById('btnTownForge'),
+    btnTownStash: document.getElementById('btnTownStash'),
+    btnTownApothecary: document.getElementById('btnTownApothecary'),
+    btnTownWaypoint: document.getElementById('btnTownWaypoint'),
+    btnTownMenu: document.getElementById('btnTownMenu'),
+    townNpcDrawer: document.getElementById('townNpcDrawer'),
+    townNpcTitle: document.getElementById('townNpcTitle'),
+    townNpcSubtitle: document.getElementById('townNpcSubtitle'),
+    townNpcGold: document.getElementById('townNpcGold'),
+    btnCloseTownNpc: document.getElementById('btnCloseTownNpc'),
+    townNpcBody: document.getElementById('townNpcBody'),
     hpOrbFill: document.getElementById('hpOrbFill'),
     hpText: document.getElementById('hpText'),
     mpOrbFill: document.getElementById('mpOrbFill'),
@@ -54,6 +181,7 @@
     xpBarFill: document.getElementById('xpBarFill'),
     floorBadge: document.getElementById('floorBadge'),
     seedBadge: document.getElementById('seedBadge'),
+    buffBadge: document.getElementById('buffBadge'),
     bossBar: document.getElementById('bossBar'),
     bossName: document.getElementById('bossName'),
     bossHpText: document.getElementById('bossHpText'),
@@ -63,14 +191,25 @@
     lootCountBadge: document.getElementById('lootCountBadge'),
     btnNewFloor: document.getElementById('btnNewFloor'),
     newFloorBtnLabel: document.getElementById('newFloorBtnLabel'),
+    btnTownPortal: document.getElementById('btnTownPortal'),
+    btnLootFilter: document.getElementById('btnLootFilter'),
+    lootFilterLabel: document.getElementById('lootFilterLabel'),
+    btnHudAudio: document.getElementById('btnHudAudio'),
+    hudAudioLabel: document.getElementById('hudAudioLabel'),
     joystickZone: document.getElementById('joystickZone'),
     joystickKnob: document.getElementById('joystickKnob'),
     btnAttack: document.getElementById('btnAttack'),
+    attackLabel: document.getElementById('attackLabel'),
     btnSkill1: document.getElementById('btnSkill1'),
     btnSkill2: document.getElementById('btnSkill2'),
     btnSkill3: document.getElementById('btnSkill3'),
+    skill1Cost: document.getElementById('skill1Cost'),
+    skill2Cost: document.getElementById('skill2Cost'),
+    skill3Cost: document.getElementById('skill3Cost'),
     btnPotion: document.getElementById('btnPotion'),
     potionCount: document.getElementById('potionCount'),
+    btnManaElixir: document.getElementById('btnManaElixir'),
+    manaElixirCount: document.getElementById('manaElixirCount'),
     deathOverlay: document.getElementById('deathOverlay'),
     deathSummary: document.getElementById('deathSummary'),
     btnRespawn: document.getElementById('btnRespawn'),
@@ -125,7 +264,9 @@
   // =========================================================================
   const sfx = {
     ctx: null,
+    muted: false,
     unlock() {
+      if (this.muted) return;
       if (!this.ctx && (window.AudioContext || window.webkitAudioContext)) {
         const AC = window.AudioContext || window.webkitAudioContext;
         this.ctx = new AC();
@@ -134,9 +275,9 @@
         this.ctx.resume().catch(() => {});
       }
     },
-    tone(freq, endFreq, dur, type = 'triangle', gainVal = 0.08) {
-      if (!this.ctx || this.ctx.state !== 'running') return;
-      const now = this.ctx.currentTime;
+    tone(freq, endFreq, dur, type = 'triangle', gainVal = 0.08, delay = 0) {
+      if (this.muted || !this.ctx || this.ctx.state !== 'running') return;
+      const now = this.ctx.currentTime + delay;
       const osc = this.ctx.createOscillator();
       const g = this.ctx.createGain();
       osc.type = type;
@@ -149,12 +290,22 @@
       osc.start(now);
       osc.stop(now + dur);
     },
-    slash() { this.tone(360, 120, 0.11, 'sawtooth', 0.06); },
-    crit()  { this.tone(620, 210, 0.16, 'square', 0.08); this.tone(920, 440, 0.14, 'triangle', 0.06); },
-    fire()  { this.tone(240, 75, 0.24, 'sawtooth', 0.09); },
-    holy()  { this.tone(520, 880, 0.26, 'sine', 0.08); this.tone(660, 1040, 0.28, 'triangle', 0.05); },
-    loot()  { this.tone(720, 1180, 0.12, 'sine', 0.07); },
-    lvl()   { this.tone(440, 880, 0.35, 'triangle', 0.09); }
+    slash()     { this.tone(360, 120, 0.11, 'sawtooth', 0.06); },
+    crit()      { this.tone(620, 210, 0.16, 'square', 0.07); this.tone(920, 440, 0.14, 'triangle', 0.05); },
+    fire()      { this.tone(240, 75, 0.24, 'sawtooth', 0.08); },
+    arcane()    { this.tone(480, 190, 0.22, 'sine', 0.07); this.tone(720, 340, 0.18, 'triangle', 0.05); },
+    holy()      { this.tone(520, 880, 0.26, 'sine', 0.07); this.tone(660, 1040, 0.28, 'triangle', 0.05); },
+    potion()    { this.tone(280, 620, 0.12, 'sine', 0.07); this.tone(440, 820, 0.14, 'sine', 0.05, 0.07); },
+    anvil()     { this.tone(980, 420, 0.22, 'square', 0.08); this.tone(1480, 680, 0.28, 'triangle', 0.06, 0.02); },
+    legendary() {
+      this.tone(523.25, 523.25, 0.16, 'triangle', 0.07, 0);
+      this.tone(659.25, 659.25, 0.18, 'triangle', 0.07, 0.08);
+      this.tone(783.99, 783.99, 0.22, 'sine', 0.08, 0.16);
+      this.tone(1046.5, 1046.5, 0.35, 'sine', 0.08, 0.24);
+    },
+    portal()    { this.tone(180, 540, 0.36, 'sine', 0.08); this.tone(270, 720, 0.34, 'triangle', 0.04, 0.05); },
+    loot()      { this.tone(720, 1180, 0.12, 'sine', 0.06); },
+    lvl()       { this.tone(440, 880, 0.35, 'triangle', 0.09); }
   };
 
   // =========================================================================
@@ -166,7 +317,9 @@
     bossFloor: null,
     wall: null,
     urn: null,
-    barrel: null
+    barrel: null,
+    torchGlow: null,
+    arcaneGlow: null
   };
 
   function makeCanvas(w, h) {
@@ -365,6 +518,18 @@
     return c;
   }
 
+  function buildGlowSprite(innerColor, midColor, radius) {
+    const c = makeCanvas(radius * 2, radius * 2);
+    const g = c.getContext('2d');
+    const grad = g.createRadialGradient(radius, radius, 2, radius, radius, radius);
+    grad.addColorStop(0, innerColor);
+    grad.addColorStop(0.5, midColor);
+    grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, radius * 2, radius * 2);
+    return c;
+  }
+
   function buildTextureAtlas() {
     atlas.floors = [
       buildFloorSprite(0, 'normal'),
@@ -376,39 +541,45 @@
     atlas.wall = buildWallSprite();
     atlas.urn = buildPropSprite('urn');
     atlas.barrel = buildPropSprite('barrel');
+    atlas.torchGlow = buildGlowSprite('rgba(249, 115, 22, 0.26)', 'rgba(217, 119, 6, 0.10)', 74);
+    atlas.arcaneGlow = buildGlowSprite('rgba(59, 130, 246, 0.28)', 'rgba(37, 99, 235, 0.09)', 74);
   }
 
   // =========================================================================
   // HERO, GEAR & PERSISTENCE STATE
   // =========================================================================
-  function createStarterGear() {
+  function createStarterGear(classId = 'paladin') {
+    if (classId === 'rogue') {
+      return {
+        weapon: { id: 'starter_twin', name: 'Shadowfang Daggers', slot: 'weapon', rarity: 'common', stats: { atk: 11, crit: 8 } },
+        helm:   { id: 'starter_hood', name: 'Nightstalker Cowl',  slot: 'helm',   rarity: 'common', stats: { hp: 14, arm: 2 } },
+        armor:  { id: 'starter_coat', name: 'Ravenhide Jerkin',   slot: 'armor',  rarity: 'common', stats: { hp: 22, arm: 4 } },
+        ring: null
+      };
+    }
+    if (classId === 'sorcerer') {
+      return {
+        weapon: { id: 'starter_staff', name: 'Bonechannel Rod',   slot: 'weapon', rarity: 'common', stats: { atk: 13, crit: 5 } },
+        helm:   { id: 'starter_circ',  name: 'Hexwoven Crown',    slot: 'helm',   rarity: 'common', stats: { hp: 12, arm: 2 } },
+        armor:  { id: 'starter_robe',  name: 'Bloodsilk Vestment',slot: 'armor',  rarity: 'common', stats: { hp: 20, arm: 3 } },
+        ring: null
+      };
+    }
     return {
-      weapon: {
-        id: 'starter_blade',
-        name: 'Iron Broadsword',
-        slot: 'weapon',
-        rarity: 'common',
-        stats: { atk: 12, crit: 4 }
-      },
-      helm: {
-        id: 'starter_helm',
-        name: 'Tempered Barbute',
-        slot: 'helm',
-        rarity: 'common',
-        stats: { hp: 20, arm: 3 }
-      },
-      armor: {
-        id: 'starter_armor',
-        name: 'Cryptguard Cuirass',
-        slot: 'armor',
-        rarity: 'common',
-        stats: { hp: 30, arm: 6 }
-      },
+      weapon: { id: 'starter_blade', name: 'Iron Broadsword',   slot: 'weapon', rarity: 'common', stats: { atk: 12, crit: 4 } },
+      helm:   { id: 'starter_helm',  name: 'Tempered Barbute',  slot: 'helm',   rarity: 'common', stats: { hp: 20, arm: 3 } },
+      armor:  { id: 'starter_armor', name: 'Cryptguard Cuirass',slot: 'armor',  rarity: 'common', stats: { hp: 30, arm: 6 } },
       ring: null
     };
   }
 
   const state = {
+    screen: 'MAIN_MENU', // 'MAIN_MENU' | 'CHAR_CREATE' | 'TOWN' | 'DUNGEON'
+    mode: 'TOWN',        // 'TOWN' | 'DUNGEON'
+    selectedCreateClass: 'paladin',
+    heroName: 'Aldric',
+    heroClass: 'paladin',
+    highestFloor: 1,
     floor: 1,
     seed: 1047,
     rng: null,
@@ -418,12 +589,15 @@
     rooms: [],
     waypoint: { x: 0, y: 0 },
     stairs: { x: 0, y: 0, unlocked: false },
+    waypointArmed: false,
     torches: [],
     gates: [],
     props: [],
+    townNpcs: [],
     monsters: [],
     lootDrops: [],
     projectiles: [],
+    poisonClouds: [],
     particles: [],
     floatTexts: [],
     slashArcs: [],
@@ -445,33 +619,46 @@
       nextXp: 100,
       gold: 0,
       potions: 3,
+      manaElixirs: 1,
       walkPhase: 0,
       attackAnim: 0,
       castAnim: 0,
       attackCd: 0,
       potionCd: 0,
+      chillTimer: 0,
       skillCds: { 1: 0, 2: 0, 3: 0 },
       hitFlash: 0,
       dead: false,
       kills: 0,
-      equipped: createStarterGear(),
+      equipped: createStarterGear('paladin'),
       bag: []
     },
-    selectedInspect: null, // { source: 'bag'|'equipped', indexOrSlot }
+    activeBuff: null, // { id, label, crit, speed, gold }
+    stash: [],
+    blacksmithStock: [],
+    lootFilter: 'all',
+    selectedInspect: null,
     pendingLootTarget: null,
     toastTimer: 0,
-    lastSaveAt: 0
+    lastSaveAt: 0,
+    lastFogTileX: -999,
+    lastFogTileY: -999,
+    fogDirty: true,
+    hudCache: {}
   };
 
   function getHeroStats() {
     const p = state.player;
+    const cls = HERO_CLASSES[state.heroClass] || HERO_CLASSES.paladin;
     const totals = {
-      atk: 10 + (p.level - 1) * 4,
-      crit: 6 + (p.level - 1) * 0.5,
-      maxHp: 100 + (p.level - 1) * 24,
-      maxMp: 75 + (p.level - 1) * 8,
+      atk: cls.baseAtk + (p.level - 1) * 4,
+      crit: cls.baseCrit + (p.level - 1) * 0.6,
+      maxHp: cls.baseHp + (p.level - 1) * cls.hpPerLvl,
+      maxMp: cls.baseMp + (p.level - 1) * cls.mpPerLvl,
       loh: 0,
-      arm: 2 + (p.level - 1) * 1.5
+      arm: cls.baseArm + (p.level - 1) * 1.5,
+      speed: cls.speed,
+      goldBonus: 1
     };
     for (const slot of SLOTS) {
       const item = p.equipped[slot];
@@ -482,7 +669,13 @@
       totals.loh += item.stats.loh || 0;
       totals.arm += item.stats.arm || 0;
     }
-    totals.crit = Math.min(65, Math.round(totals.crit * 10) / 10);
+    if (state.activeBuff) {
+      if (state.activeBuff.crit) totals.crit += state.activeBuff.crit;
+      if (state.activeBuff.speed) totals.speed *= (1 + state.activeBuff.speed);
+      if (state.activeBuff.gold) totals.goldBonus += state.activeBuff.gold;
+    }
+    if (p.chillTimer > 0) totals.speed *= 0.7;
+    totals.crit = Math.min(75, Math.round(totals.crit * 10) / 10);
     return totals;
   }
 
@@ -494,11 +687,14 @@
     state.player.mp = Math.min(state.player.mp, state.player.maxMp);
   }
 
-  function saveProgress() {
+  function saveHeroProfile() {
     try {
       const p = state.player;
       const payload = {
-        v: '0.1.0',
+        v: VERSION,
+        heroName: state.heroName,
+        heroClass: state.heroClass,
+        highestFloor: state.highestFloor,
         floor: state.floor,
         seed: state.seed,
         level: p.level,
@@ -506,39 +702,86 @@
         nextXp: p.nextXp,
         gold: p.gold,
         potions: p.potions,
+        manaElixirs: p.manaElixirs,
         kills: p.kills,
         equipped: p.equipped,
-        bag: p.bag
+        bag: p.bag,
+        activeBuff: state.activeBuff
       };
       localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
-    } catch (_) {
-      // Ignore private-mode storage quota errors
-    }
+    } catch (_) {}
+  }
+  const saveProgress = saveHeroProfile;
+
+  function saveStash() {
+    try {
+      localStorage.setItem(STASH_KEY, JSON.stringify(state.stash.slice(0, MAX_STASH_SLOTS)));
+    } catch (_) {}
+  }
+
+  function loadStash() {
+    try {
+      const raw = localStorage.getItem(STASH_KEY);
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) state.stash = arr.slice(0, MAX_STASH_SLOTS);
+      }
+    } catch (_) {}
+  }
+
+  function savePrefs() {
+    try {
+      localStorage.setItem(PREFS_KEY, JSON.stringify({ muted: sfx.muted, lootFilter: state.lootFilter }));
+    } catch (_) {}
+  }
+
+  function loadPrefs() {
+    try {
+      const raw = localStorage.getItem(PREFS_KEY);
+      if (!raw) return;
+      const pr = JSON.parse(raw);
+      if (typeof pr.muted === 'boolean') sfx.muted = pr.muted;
+      if (LOOT_FILTER_MODES.includes(pr.lootFilter)) state.lootFilter = pr.lootFilter;
+    } catch (_) {}
   }
 
   function loadProgress() {
+    let hasSave = false;
     try {
-      const raw = localStorage.getItem(SAVE_KEY);
-      if (!raw) return;
-      const data = JSON.parse(raw);
-      if (!data || typeof data !== 'object') return;
-      const p = state.player;
-      if (Number.isFinite(data.floor) && data.floor >= 1) state.floor = data.floor;
-      if (Number.isFinite(data.seed)) state.seed = data.seed;
-      if (Number.isFinite(data.level) && data.level >= 1) p.level = data.level;
-      if (Number.isFinite(data.xp)) p.xp = data.xp;
-      if (Number.isFinite(data.nextXp)) p.nextXp = data.nextXp;
-      if (Number.isFinite(data.gold)) p.gold = data.gold;
-      if (Number.isFinite(data.potions)) p.potions = data.potions;
-      if (Number.isFinite(data.kills)) p.kills = data.kills;
-      if (data.equipped) p.equipped = Object.assign(createStarterGear(), data.equipped);
-      if (Array.isArray(data.bag)) p.bag = data.bag.slice(0, MAX_BAG_SLOTS);
-    } catch (_) {
-      // Fallback to fresh save
-    }
+      const raw = localStorage.getItem(SAVE_KEY) || localStorage.getItem(LEGACY_SAVE_KEY);
+      if (raw) {
+        const data = JSON.parse(raw);
+        if (data && typeof data === 'object') {
+          hasSave = true;
+          const p = state.player;
+          if (typeof data.heroName === 'string' && data.heroName.trim()) state.heroName = data.heroName.trim();
+          if (HERO_CLASSES[data.heroClass]) state.heroClass = data.heroClass;
+          if (Number.isFinite(data.floor) && data.floor >= 1) state.floor = data.floor;
+          if (Number.isFinite(data.highestFloor) && data.highestFloor >= 1) {
+            state.highestFloor = Math.max(state.floor, data.highestFloor);
+          } else {
+            state.highestFloor = state.floor;
+          }
+          if (Number.isFinite(data.seed)) state.seed = data.seed;
+          if (Number.isFinite(data.level) && data.level >= 1) p.level = data.level;
+          if (Number.isFinite(data.xp)) p.xp = data.xp;
+          if (Number.isFinite(data.nextXp)) p.nextXp = data.nextXp;
+          if (Number.isFinite(data.gold)) p.gold = data.gold;
+          if (Number.isFinite(data.potions)) p.potions = data.potions;
+          if (Number.isFinite(data.manaElixirs)) p.manaElixirs = data.manaElixirs;
+          if (Number.isFinite(data.kills)) p.kills = data.kills;
+          if (data.equipped) p.equipped = Object.assign(createStarterGear(state.heroClass), data.equipped);
+          if (Array.isArray(data.bag)) p.bag = data.bag.slice(0, MAX_BAG_SLOTS);
+          if (data.activeBuff && typeof data.activeBuff === 'object') state.activeBuff = data.activeBuff;
+        }
+      }
+    } catch (_) {}
+    loadStash();
+    loadPrefs();
     syncPlayerVitalsBounds();
     state.player.hp = state.player.maxHp;
     state.player.mp = state.player.maxMp;
+    return hasSave;
   }
 
   // =========================================================================
@@ -785,16 +1028,18 @@
       }
     }
 
-    // 8. Spawn Dungeon Monsters (Skeletal Warriors, Champion Ghouls, Boss Horned Demon Brute)
+    // 8. Spawn Dungeon Monsters (Skeletal Warriors, Champion Ghouls with Affixes, Boss / Floor Guardian)
     const floorMult = 1 + (state.floor - 1) * 0.28;
+    const isMilestone = state.floor % 3 === 0;
     for (const r of state.rooms) {
       if (r === spawnRoom) continue;
 
       if (r === bossRoom) {
-        state.monsters.push(createMonster('boss', bossRoom.cx + 0.2, bossRoom.cy - 0.9, floorMult));
+        const boss = createMonster('boss', bossRoom.cx + 0.2, bossRoom.cy - 0.9, floorMult, isMilestone, rng);
+        state.monsters.push(boss);
         // Two skeletal honor guards
-        state.monsters.push(createMonster('skeleton', bossRoom.x + 1.2, bossRoom.y + 1.2, floorMult));
-        state.monsters.push(createMonster('skeleton', bossRoom.x + bossRoom.w - 1.2, bossRoom.y + bossRoom.h - 1.2, floorMult));
+        state.monsters.push(createMonster('skeleton', bossRoom.x + 1.2, bossRoom.y + 1.2, floorMult, false, rng));
+        state.monsters.push(createMonster('skeleton', bossRoom.x + bossRoom.w - 1.2, bossRoom.y + bossRoom.h - 1.2, floorMult, false, rng));
         continue;
       }
 
@@ -802,22 +1047,101 @@
       for (let i = 0; i < skelCount; i++) {
         const mx = r.x + 1 + rng() * Math.max(1, r.w - 2);
         const my = r.y + 1 + rng() * Math.max(1, r.h - 2);
-        state.monsters.push(createMonster('skeleton', mx, my, floorMult));
+        state.monsters.push(createMonster('skeleton', mx, my, floorMult, false, rng));
       }
 
       if (rng() > 0.35 || r.id % 2 === 1) {
         const gx = r.cx + (rng() - 0.5) * 1.6;
         const gy = r.cy + (rng() - 0.5) * 1.6;
-        state.monsters.push(createMonster('ghoul', gx, gy, floorMult));
+        state.monsters.push(createMonster('ghoul', gx, gy, floorMult, false, rng));
       }
     }
 
-    updateFogOfWar();
-    updateHud();
-    showToast(`Floor ${state.floor} • Crypt (#${state.seed})`);
+    state.mode = 'DUNGEON';
+    state.townNpcs = [];
+    state.poisonClouds = [];
+    state.waypointArmed = false;
+    state.lastFogTileX = -999;
+    state.lastFogTileY = -999;
+    updateFogOfWar(true);
+    updateHud(true);
+    showToast(isMilestone ? `Floor ${state.floor} • Guardian Lair (#${state.seed})` : `Floor ${state.floor} • Crypt (#${state.seed})`);
   }
 
-  function createMonster(type, x, y, floorMult) {
+  function generateTown() {
+    state.mode = 'TOWN';
+    state.grid = Array.from({ length: MAP_H }, () => new Uint8Array(MAP_W));
+    state.tileVariant = Array.from({ length: MAP_H }, () => new Uint8Array(MAP_W));
+    state.explored = Array.from({ length: MAP_H }, () => new Uint8Array(MAP_W));
+    state.rooms = [];
+    state.torches = [];
+    state.gates = [];
+    state.props = [];
+    state.monsters = [];
+    state.lootDrops = [];
+    state.projectiles = [];
+    state.poisonClouds = [];
+    state.particles = [];
+    state.floatTexts = [];
+    state.slashArcs = [];
+    state.novaWaves = [];
+    state.pendingLootTarget = null;
+    state.stairs = { x: 0, y: 0, unlocked: false };
+
+    const minX = 11, maxX = 30, minY = 11, maxY = 30;
+    for (let y = minY; y <= maxY; y++) {
+      for (let x = minX; x <= maxX; x++) {
+        const isBorder = x === minX || x === maxX || y === minY || y === maxY;
+        if (isBorder) {
+          state.grid[y][x] = TILE.WALL;
+        } else {
+          const inPlaza = x >= 18 && x <= 23 && y >= 18 && y <= 23;
+          state.grid[y][x] = inPlaza ? TILE.SANCTUM : TILE.FLOOR;
+          state.tileVariant[y][x] = (x + y) % 3;
+        }
+        state.explored[y][x] = 2;
+      }
+    }
+
+    state.waypoint = { x: 20.5, y: 20.5 };
+    state.player.x = 20.5;
+    state.player.y = 22.8;
+    state.player.dead = false;
+    state.player.chillTimer = 0;
+    state.player.hp = state.player.maxHp;
+    state.player.mp = state.player.maxMp;
+    const camIso = worldToIso(state.player.x, state.player.y);
+    state.camera.x = camIso.x;
+    state.camera.y = camIso.y;
+
+    // Warm Town Lanterns & Central Campfire Glow
+    const lanternCoords = [
+      { x: 13.5, y: 13.5 }, { x: 27.5, y: 13.5 },
+      { x: 13.5, y: 27.5 }, { x: 27.5, y: 27.5 },
+      { x: 18.2, y: 18.2 }, { x: 22.8, y: 18.2 },
+      { x: 18.2, y: 22.8 }, { x: 22.8, y: 22.8 }
+    ];
+    for (let i = 0; i < lanternCoords.length; i++) {
+      state.torches.push({ x: lanternCoords[i].x, y: lanternCoords[i].y, phase: i * 0.9, isArcane: false });
+    }
+    state.torches.push({ x: 20.5, y: 20.5, phase: 0.4, isArcane: true });
+
+    state.townNpcs = [
+      { id: 'blacksmith', label: 'Blacksmith Forge', short: 'FORGE', x: 15.5, y: 16.5, color: '#f97316' },
+      { id: 'stash',      label: 'Hero Stash',       short: 'STASH', x: 25.5, y: 16.5, color: '#facc15' },
+      { id: 'apothecary', label: 'Apothecary',       short: 'HEALER',x: 15.5, y: 25.5, color: '#4ade80' },
+      { id: 'waypoint',   label: 'Waypoint Portal',  short: 'PORTAL',x: 20.5, y: 20.5, color: '#60a5fa' }
+    ];
+
+    state.fogDirty = true;
+    state.lastFogTileX = Math.floor(state.player.x);
+    state.lastFogTileY = Math.floor(state.player.y);
+    refreshBlacksmithStock();
+    updateHud(true);
+    showToast('Shadowhaven Sanctuary — Vitals Restored');
+  }
+
+  function createMonster(type, x, y, floorMult, isGuardian = false, rng = Math.random) {
     const specs = {
       skeleton: {
         name: 'Skeletal Warrior',
@@ -857,26 +1181,56 @@
       }
     };
     const s = specs[type];
+    const affixKeys = Object.keys(ELITE_AFFIXES);
+    const affixes = [];
+    if (type === 'ghoul') {
+      affixes.push(affixKeys[Math.floor(rng() * affixKeys.length)]);
+    } else if (type === 'boss') {
+      const count = isGuardian ? 2 : 1;
+      for (let i = 0; i < count; i++) {
+        const pick = affixKeys[Math.floor(rng() * affixKeys.length)];
+        if (!affixes.includes(pick)) affixes.push(pick);
+      }
+    }
+
+    let name = s.name;
+    let maxHp = s.maxHp;
+    let speed = s.speed;
+    let cd = s.cd;
+    let xp = s.xp;
+    if (isGuardian && type === 'boss') {
+      const gIdx = Math.floor((state.floor / 3 - 1) % FLOOR_GUARDIANS.length);
+      name = FLOOR_GUARDIANS[Math.max(0, gIdx)];
+      maxHp = Math.round(maxHp * 1.35);
+      xp = Math.round(xp * 1.6);
+    }
+    if (affixes.includes('fast')) {
+      speed *= 1.35;
+      cd *= 0.78;
+    }
+
     return {
       id: Math.random().toString(36).slice(2, 9),
       type,
-      name: s.name,
+      name,
+      affixes,
+      isGuardian: Boolean(isGuardian && type === 'boss'),
       x,
       y,
-      hp: s.maxHp,
-      maxHp: s.maxHp,
+      hp: maxHp,
+      maxHp,
       atk: s.atk,
-      speed: s.speed,
+      speed,
       range: s.range,
       aggro: s.aggro,
-      atkCdMax: s.cd,
+      atkCdMax: cd,
       atkCd: 0.3,
-      xp: s.xp,
+      xp,
       radius: s.radius,
       tier: s.tier,
       facingX: 0,
       facingY: 1,
-      walkPhase: Math.random() * Math.PI * 2,
+      walkPhase: rng() * Math.PI * 2,
       hitFlash: 0,
       stunTimer: 0,
       windupTimer: 0,
@@ -918,24 +1272,87 @@
     }
   }
 
-  function updateFogOfWar() {
+  const fogLightCanvas = makeCanvas(MAP_W * 4, MAP_H * 4);
+  const fogLightCtx = fogLightCanvas.getContext('2d');
+  const minimapStaticCanvas = makeCanvas(144, 144);
+  const minimapStaticCtx = minimapStaticCanvas.getContext('2d');
+
+  function rebuildFogAndMinimapCache() {
+    const fw = fogLightCanvas.width;
+    const fh = fogLightCanvas.height;
+    fogLightCtx.clearRect(0, 0, fw, fh);
+    fogLightCtx.fillStyle = 'rgba(4, 5, 9, 0.72)';
+    fogLightCtx.fillRect(0, 0, fw, fh);
+    for (let y = 0; y < MAP_H; y++) {
+      for (let x = 0; x < MAP_W; x++) {
+        const exp = state.explored[y][x];
+        if (exp === 2) {
+          fogLightCtx.clearRect(x * 4, y * 4, 4, 4);
+        } else if (exp === 1) {
+          fogLightCtx.clearRect(x * 4, y * 4, 4, 4);
+          fogLightCtx.fillStyle = 'rgba(4, 5, 9, 0.45)';
+          fogLightCtx.fillRect(x * 4, y * 4, 4, 4);
+        }
+      }
+    }
+
+    const mw = minimapStaticCanvas.width;
+    const mh = minimapStaticCanvas.height;
+    const cellW = mw / MAP_W;
+    const cellH = mh / MAP_H;
+    minimapStaticCtx.clearRect(0, 0, mw, mh);
+    minimapStaticCtx.fillStyle = 'rgba(7, 8, 12, 0.92)';
+    minimapStaticCtx.fillRect(0, 0, mw, mh);
+
+    for (let y = 0; y < MAP_H; y++) {
+      for (let x = 0; x < MAP_W; x++) {
+        const exp = state.explored[y][x];
+        if (!exp) continue;
+        const t = state.grid[y][x];
+        if (t === TILE.WALL) {
+          minimapStaticCtx.fillStyle = exp === 2 ? '#475569' : '#262d3d';
+        } else if (t !== TILE.VOID) {
+          minimapStaticCtx.fillStyle = exp === 2 ? '#1e293b' : '#111622';
+        } else {
+          continue;
+        }
+        minimapStaticCtx.fillRect(x * cellW, y * cellH, Math.ceil(cellW), Math.ceil(cellH));
+      }
+    }
+    state.fogDirty = false;
+  }
+
+  function updateFogOfWar(force = false) {
+    if (state.mode === 'TOWN') {
+      if (force || state.fogDirty) rebuildFogAndMinimapCache();
+      return;
+    }
     const px = Math.floor(state.player.x);
     const py = Math.floor(state.player.y);
-    const visR = 8;
+    if (!force && px === state.lastFogTileX && py === state.lastFogTileY) return;
+    state.lastFogTileX = px;
+    state.lastFogTileY = py;
 
+    const visR = 8;
     for (let y = 0; y < MAP_H; y++) {
       for (let x = 0; x < MAP_W; x++) {
         if (state.explored[y][x] === 2) state.explored[y][x] = 1;
       }
     }
 
-    for (let y = Math.max(0, py - visR); y <= Math.min(MAP_H - 1, py + visR); y++) {
-      for (let x = Math.max(0, px - visR); x <= Math.min(MAP_W - 1, px + visR); x++) {
-        if (dist(px, py, x, y) <= visR) {
+    const minY = Math.max(0, py - visR);
+    const maxY = Math.min(MAP_H - 1, py + visR);
+    const minX = Math.max(0, px - visR);
+    const maxX = Math.min(MAP_W - 1, px + visR);
+    for (let y = minY; y <= maxY; y++) {
+      for (let x = minX; x <= maxX; x++) {
+        if ((px - x) * (px - x) + (py - y) * (py - y) <= visR * visR) {
           state.explored[y][x] = 2;
         }
       }
     }
+    state.fogDirty = true;
+    rebuildFogAndMinimapCache();
   }
 
   // =========================================================================
@@ -1021,12 +1438,26 @@
       }, drop));
     };
 
+    if (sourceTier === 'guardian') {
+      const goldMult = getHeroStats().goldBonus;
+      pushDrop({ kind: 'gold', amount: Math.round((85 + Math.random() * 45) * state.floor * goldMult), label: 'Guardian Chest' });
+      pushDrop({ kind: 'potion', amount: 2, label: 'Crimson Vials' });
+      const leg = generateItem('legendary');
+      pushDrop({ kind: 'gear', item: leg, rarity: 'legendary', label: leg.name });
+      const rareItem = generateItem('rare');
+      pushDrop({ kind: 'gear', item: rareItem, rarity: 'rare', label: rareItem.name, destX: wx + 0.5, destY: wy - 0.35 });
+      sfx.legendary();
+      return;
+    }
+
     if (sourceTier === 'boss') {
-      pushDrop({ kind: 'gold', amount: Math.round((45 + Math.random() * 35) * state.floor), label: 'Boss Hoard' });
+      const goldMult = getHeroStats().goldBonus;
+      pushDrop({ kind: 'gold', amount: Math.round((45 + Math.random() * 35) * state.floor * goldMult), label: 'Boss Hoard' });
       pushDrop({ kind: 'potion', amount: 1, label: 'Crimson Vial' });
       const gearRarity = Math.random() < 0.45 ? 'legendary' : 'rare';
       const item = generateItem(gearRarity);
       pushDrop({ kind: 'gear', item, rarity: gearRarity, label: item.name });
+      if (gearRarity === 'legendary') sfx.legendary();
       const bonus = generateItem(Math.random() < 0.5 ? 'rare' : 'magic');
       pushDrop({
         kind: 'gear',
@@ -1039,17 +1470,19 @@
       return;
     }
 
+    const goldMult = getHeroStats().goldBonus;
     if (sourceTier === 'elite') {
-      pushDrop({ kind: 'gold', amount: Math.round((18 + Math.random() * 18) * state.floor), label: 'Gold Coins' });
+      pushDrop({ kind: 'gold', amount: Math.round((18 + Math.random() * 18) * state.floor * goldMult), label: 'Gold Coins' });
       const rarity = roll < 0.18 ? 'legendary' : roll < 0.55 ? 'rare' : 'magic';
       const item = generateItem(rarity);
       pushDrop({ kind: 'gear', item, rarity, label: item.name });
+      if (rarity === 'legendary') sfx.legendary();
       return;
     }
 
     if (sourceTier === 'prop') {
       if (roll < 0.55) {
-        const amt = Math.round((6 + Math.random() * 10) * state.floor);
+        const amt = Math.round((6 + Math.random() * 10) * state.floor * goldMult);
         pushDrop({ kind: 'gold', amount: amt, label: `${amt} Gold` });
       } else if (roll < 0.78) {
         pushDrop({ kind: 'potion', amount: 1, label: 'Health Potion' });
@@ -1063,7 +1496,7 @@
 
     // Normal skeleton drop
     if (roll < 0.45) {
-      const amt = Math.round((8 + Math.random() * 14) * state.floor);
+      const amt = Math.round((8 + Math.random() * 14) * state.floor * goldMult);
       pushDrop({ kind: 'gold', amount: amt, label: `${amt} Gold` });
     } else if (roll < 0.58) {
       pushDrop({ kind: 'potion', amount: 1, label: 'Health Potion' });
@@ -1071,7 +1504,16 @@
       const rarity = roll > 0.84 ? 'legendary' : roll > 0.74 ? 'rare' : 'magic';
       const item = generateItem(rarity);
       pushDrop({ kind: 'gear', item, rarity, label: item.name });
+      if (rarity === 'legendary') sfx.legendary();
     }
+  }
+
+  function passesLootFilter(drop) {
+    if (!drop || drop.kind !== 'gear') return true;
+    if (drop.rarity === 'legendary') return true;
+    if (state.lootFilter === 'rare') return drop.rarity === 'rare';
+    if (state.lootFilter === 'magic') return drop.rarity === 'magic' || drop.rarity === 'rare';
+    return true;
   }
 
   function collectLootDrop(dropIdx) {
@@ -1091,8 +1533,8 @@
 
     if (drop.kind === 'potion') {
       p.potions += drop.amount;
-      addFloatText(drop.x, drop.y, '+1 Potion', '#fca5a5', false);
-      sfx.loot();
+      addFloatText(drop.x, drop.y, `+${drop.amount} Potion`, '#fca5a5', false);
+      sfx.potion();
       state.lootDrops.splice(dropIdx, 1);
       updateHud();
       saveProgress();
@@ -1109,8 +1551,10 @@
       addFloatText(drop.x, drop.y, drop.item.name, rColor, drop.rarity === 'legendary');
       if (drop.rarity === 'legendary') {
         showToast(`Legendary Found: ${drop.item.name}!`);
+        sfx.legendary();
+      } else {
+        sfx.loot();
       }
-      sfx.loot();
       state.lootDrops.splice(dropIdx, 1);
       updateHud();
       saveProgress();
@@ -1215,13 +1659,26 @@
 
     state.player.kills += 1;
     spawnParticles(m.x, m.y, m.type === 'ghoul' ? '#60a5fa' : '#94a3b8', 16, 3.0);
+
+    // Molten affix death explosion
+    if (m.affixes && m.affixes.includes('molten')) {
+      sfx.fire();
+      state.novaWaves.push({ x: m.x, y: m.y, r: 0.3, maxR: 2.1, color: '#f97316', life: 0.28, maxLife: 0.28 });
+      spawnParticles(m.x, m.y, '#fb923c', 16, 3.6);
+      if (dist(m.x, m.y, state.player.x, state.player.y) <= 2.1) {
+        damagePlayer(Math.round(m.atk * 1.1));
+      }
+    }
+
     grantXp(m.xp);
-    spawnLootDrop(m.x, m.y, m.tier);
+    spawnLootDrop(m.x, m.y, m.isGuardian ? 'guardian' : m.tier);
 
     if (m.type === 'boss') {
       state.stairs.unlocked = true;
+      state.highestFloor = Math.max(state.highestFloor, state.floor + 1);
       state.camera.shake = 9;
-      showToast('Horned Demon Brute Slain! Descent Stairs Unsealed!');
+      showToast(`${m.name} Slain! Descent Stairs Unsealed!`);
+      saveHeroProfile();
       updateHud();
     }
   }
@@ -1261,32 +1718,51 @@
     }
   }
 
-  function performSwordSlash() {
+  function performBasicAttack() {
     const p = state.player;
-    if (p.dead || p.attackCd > 0) return;
-    p.attackCd = 0.34;
-    p.attackAnim = 0.24;
+    if (p.dead || p.attackCd > 0 || state.mode === 'TOWN') return;
+    const cls = state.heroClass;
+    p.attackCd = cls === 'rogue' ? 0.25 : cls === 'sorcerer' ? 0.36 : 0.34;
+    p.attackAnim = 0.22;
 
     if (input.aimX !== null && input.aimY !== null) {
       p.facingX = input.aimX;
       p.facingY = input.aimY;
     } else {
-      autoFaceTarget(3.4);
+      autoFaceTarget(cls === 'sorcerer' ? 8.5 : 3.4);
+    }
+
+    const stats = getHeroStats();
+
+    if (cls === 'sorcerer') {
+      // Shadow Bolt projectile
+      sfx.arcane();
+      state.projectiles.push({
+        kind: 'shadow',
+        x: p.x + p.facingX * 0.45,
+        y: p.y + p.facingY * 0.45,
+        vx: p.facingX * 11.2,
+        vy: p.facingY * 11.2,
+        dmg: stats.atk * 1.15,
+        aoe: 0.9,
+        life: 1.15
+      });
+      return;
     }
 
     sfx.slash();
-    const stats = getHeroStats();
-    const reach = 2.05;
+    const reach = cls === 'rogue' ? 1.85 : 2.05;
     state.slashArcs.push({
       x: p.x,
       y: p.y,
       angle: Math.atan2(p.facingY, p.facingX),
-      life: 0.2,
-      maxLife: 0.2,
-      radius: 44,
-      color: '#fde047'
+      life: 0.18,
+      maxLife: 0.18,
+      radius: cls === 'rogue' ? 38 : 44,
+      color: cls === 'rogue' ? '#4ade80' : '#fde047'
     });
 
+    const mult = cls === 'rogue' ? 0.9 : 1.0;
     for (let i = state.monsters.length - 1; i >= 0; i--) {
       const m = state.monsters[i];
       const dx = m.x - p.x;
@@ -1295,17 +1771,18 @@
       if (d <= reach + m.radius) {
         const dot = (dx / (d || 1)) * p.facingX + (dy / (d || 1)) * p.facingY;
         if (dot >= -0.25 || d < 1.05) {
-          damageMonster(m, stats.atk, dx / (d || 1), dy / (d || 1), true);
+          damageMonster(m, stats.atk * mult, dx / (d || 1), dy / (d || 1), true);
         }
       }
     }
-
     breakNearbyProps(p.x + p.facingX * 0.9, p.y + p.facingY * 0.9, 1.45);
   }
+  const performSwordSlash = performBasicAttack;
 
   function castSkill(slotId) {
     const p = state.player;
-    const cfg = SKILL_CONFIG[slotId];
+    if (state.mode === 'TOWN') return;
+    const cfg = getActiveSkillConfig()[slotId];
     if (!cfg || p.dead) return;
     if (p.skillCds[slotId] > 0) return;
     if (p.mp < cfg.mana) {
@@ -1317,9 +1794,102 @@
     p.skillCds[slotId] = cfg.cd;
     p.castAnim = 0.28;
     const stats = getHeroStats();
+    const cls = state.heroClass;
 
+    if (cls === 'rogue') {
+      if (slotId === 1) {
+        // Multishot (3-bolt fan)
+        autoFaceTarget(9.0);
+        sfx.slash();
+        const baseAng = Math.atan2(p.facingY, p.facingX);
+        for (const off of [-0.24, 0, 0.24]) {
+          const a = baseAng + off;
+          state.projectiles.push({
+            kind: 'bolt',
+            x: p.x + Math.cos(a) * 0.4,
+            y: p.y + Math.sin(a) * 0.4,
+            vx: Math.cos(a) * 12.2,
+            vy: Math.sin(a) * 12.2,
+            dmg: stats.atk * 1.25,
+            aoe: 0.8,
+            life: 1.0
+          });
+        }
+      } else if (slotId === 2) {
+        // Poison Trap cloud at hero feet
+        sfx.arcane();
+        state.poisonClouds.push({ x: p.x, y: p.y, r: 2.3, life: 4.5, tick: 0, dmg: stats.atk * 0.72 });
+        spawnParticles(p.x, p.y, '#4ade80', 14, 2.5);
+      } else if (slotId === 3) {
+        // Shadow Dash forward + slash
+        sfx.slash();
+        moveWithSlide(p, p.facingX * 2.8, p.facingY * 2.8, 0.31);
+        updateFogOfWar();
+        state.novaWaves.push({ x: p.x, y: p.y, r: 0.3, maxR: 2.1, color: '#4ade80', life: 0.24, maxLife: 0.24 });
+        for (let i = state.monsters.length - 1; i >= 0; i--) {
+          const m = state.monsters[i];
+          const d = dist(p.x, p.y, m.x, m.y);
+          if (d <= 2.2 + m.radius) {
+            damageMonster(m, stats.atk * 1.65, (m.x - p.x) / (d || 1), (m.y - p.y) / (d || 1), true);
+          }
+        }
+      }
+      updateHud();
+      return;
+    }
+
+    if (cls === 'sorcerer') {
+      if (slotId === 1) {
+        // Bone Nova
+        sfx.arcane();
+        state.novaWaves.push({ x: p.x, y: p.y, r: 0.4, maxR: 2.7, color: '#e2e8f0', life: 0.3, maxLife: 0.3 });
+        for (let i = state.monsters.length - 1; i >= 0; i--) {
+          const m = state.monsters[i];
+          const d = dist(p.x, p.y, m.x, m.y);
+          if (d <= 2.7 + m.radius) {
+            damageMonster(m, stats.atk * 1.6, (m.x - p.x) / (d || 1), (m.y - p.y) / (d || 1), true);
+          }
+        }
+        breakNearbyProps(p.x, p.y, 2.5);
+      } else if (slotId === 2) {
+        // Frost Orb projectile
+        autoFaceTarget(9.0);
+        sfx.arcane();
+        state.projectiles.push({
+          kind: 'frost',
+          x: p.x + p.facingX * 0.45,
+          y: p.y + p.facingY * 0.45,
+          vx: p.facingX * 9.0,
+          vy: p.facingY * 9.0,
+          dmg: stats.atk * 2.0,
+          aoe: 2.3,
+          life: 1.5
+        });
+      } else if (slotId === 3) {
+        // Soul Drain AoE + Lifesteal
+        sfx.holy();
+        let totalHeal = 0;
+        state.novaWaves.push({ x: p.x, y: p.y, r: 0.4, maxR: 3.1, color: '#c084fc', life: 0.36, maxLife: 0.36 });
+        for (let i = state.monsters.length - 1; i >= 0; i--) {
+          const m = state.monsters[i];
+          const d = dist(p.x, p.y, m.x, m.y);
+          if (d <= 3.1 + m.radius) {
+            damageMonster(m, stats.atk * 1.5, (m.x - p.x) / (d || 1), (m.y - p.y) / (d || 1), true);
+            totalHeal += Math.round(p.maxHp * 0.12);
+          }
+        }
+        if (totalHeal > 0) {
+          const capped = Math.min(totalHeal, Math.round(p.maxHp * 0.45));
+          p.hp = Math.min(p.maxHp, p.hp + capped);
+          addFloatText(p.x, p.y, `+${capped} HP`, '#4ade80', false);
+        }
+      }
+      updateHud();
+      return;
+    }
+
+    // Paladin default kit
     if (slotId === 1) {
-      // Whirlwind Cleave (360-degree AoE)
       sfx.slash();
       state.novaWaves.push({ x: p.x, y: p.y, r: 0.4, maxR: 2.35, color: '#facc15', life: 0.28, maxLife: 0.28 });
       state.camera.shake = Math.max(state.camera.shake, 4);
@@ -1327,26 +1897,24 @@
         const m = state.monsters[i];
         const d = dist(p.x, p.y, m.x, m.y);
         if (d <= 2.35 + m.radius) {
-          const nx = (m.x - p.x) / (d || 1);
-          const ny = (m.y - p.y) / (d || 1);
-          damageMonster(m, stats.atk * 1.65, nx, ny, true);
+          damageMonster(m, stats.atk * 1.65, (m.x - p.x) / (d || 1), (m.y - p.y) / (d || 1), true);
         }
       }
       breakNearbyProps(p.x, p.y, 2.35);
     } else if (slotId === 2) {
-      // Fireball projectile
       autoFaceTarget(9.0);
       sfx.fire();
       state.projectiles.push({
+        kind: 'fire',
         x: p.x + p.facingX * 0.45,
         y: p.y + p.facingY * 0.45,
         vx: p.facingX * 10.5,
         vy: p.facingY * 10.5,
         dmg: stats.atk * 2.1,
+        aoe: 2.0,
         life: 1.4
       });
     } else if (slotId === 3) {
-      // Holy Nova: AoE damage + brief stun + heal
       sfx.holy();
       const heal = Math.round(p.maxHp * 0.28);
       p.hp = Math.min(p.maxHp, p.hp + heal);
@@ -1358,9 +1926,7 @@
         const d = dist(p.x, p.y, m.x, m.y);
         if (d <= 3.1 + m.radius) {
           m.stunTimer = Math.max(m.stunTimer, 1.15);
-          const nx = (m.x - p.x) / (d || 1);
-          const ny = (m.y - p.y) / (d || 1);
-          damageMonster(m, stats.atk * 1.45, nx, ny, true);
+          damageMonster(m, stats.atk * 1.45, (m.x - p.x) / (d || 1), (m.y - p.y) / (d || 1), true);
         }
       }
       breakNearbyProps(p.x, p.y, 3.0);
@@ -1383,9 +1949,31 @@
     p.potionCd = 1.2;
     const heal = Math.round(p.maxHp * 0.45);
     p.hp = Math.min(p.maxHp, p.hp + heal);
-    sfx.holy();
+    sfx.potion();
     addFloatText(p.x, p.y, `+${heal} HP`, '#4ade80', false);
     spawnParticles(p.x, p.y, '#ef4444', 10, 2.2);
+    updateHud();
+    saveProgress();
+  }
+
+  function drinkManaElixir() {
+    const p = state.player;
+    if (p.dead || p.potionCd > 0) return;
+    if (p.manaElixirs <= 0) {
+      showToast('No Mana Elixirs remaining!');
+      return;
+    }
+    if (p.mp >= p.maxMp) {
+      showToast('Mana already full.');
+      return;
+    }
+    p.manaElixirs -= 1;
+    p.potionCd = 1.0;
+    const gain = Math.round(p.maxMp * 0.55);
+    p.mp = Math.min(p.maxMp, p.mp + gain);
+    sfx.potion();
+    addFloatText(p.x, p.y, `+${gain} MP`, '#60a5fa', false);
+    spawnParticles(p.x, p.y, '#3b82f6', 10, 2.2);
     updateHud();
     saveProgress();
   }
@@ -1407,22 +1995,24 @@
   function setupInputs() {
     window.addEventListener('keydown', (e) => {
       sfx.unlock();
+      if (state.screen === 'MAIN_MENU' || state.screen === 'CHAR_CREATE') return;
       const k = e.key.toLowerCase();
       if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(k)) {
-        if (!dom.inventoryDrawer.open) e.preventDefault();
+        if (!dom.inventoryDrawer.open && !dom.townNpcDrawer.open) e.preventDefault();
       }
       if (k === 'i') {
         toggleInventory();
         return;
       }
-      if (dom.inventoryDrawer.open || state.player.dead) return;
+      if (dom.inventoryDrawer.open || dom.townNpcDrawer.open || state.player.dead) return;
 
       input.keys.add(k);
-      if (k === ' ') performSwordSlash();
+      if (k === ' ') performBasicAttack();
       else if (k === '1') castSkill(1);
       else if (k === '2') castSkill(2);
       else if (k === '3') castSkill(3);
       else if (k === 'q') drinkHealthPotion();
+      else if (k === 'r') drinkManaElixir();
       else if (k === 'e') lootNearestGroundDrop();
     });
 
@@ -1467,25 +2057,40 @@
         fn();
       });
     };
-    bindBtn(dom.btnAttack, performSwordSlash);
+    bindBtn(dom.btnAttack, performBasicAttack);
     bindBtn(dom.btnSkill1, () => castSkill(1));
     bindBtn(dom.btnSkill2, () => castSkill(2));
     bindBtn(dom.btnSkill3, () => castSkill(3));
     bindBtn(dom.btnPotion, drinkHealthPotion);
+    bindBtn(dom.btnManaElixir, drinkManaElixir);
 
-    // Canvas Tap / Click: Loot Nameplate hit-test OR Desktop Sword Slash toward cursor
+    // Canvas Tap / Click: Town Station tap OR Loot Nameplate hit-test OR Basic Attack
     canvas.addEventListener('pointerdown', (e) => {
       sfx.unlock();
-      if (state.player.dead || dom.inventoryDrawer.open) return;
+      if (state.screen === 'MAIN_MENU' || state.screen === 'CHAR_CREATE') return;
+      if (state.player.dead || dom.inventoryDrawer.open || dom.townNpcDrawer.open) return;
 
       const rect = canvas.getBoundingClientRect();
       const sx = e.clientX - rect.left;
       const sy = e.clientY - rect.top;
 
+      if (state.mode === 'TOWN') {
+        const worldX = sx - rect.width * 0.5 + state.camera.x;
+        const worldY = sy - rect.height * 0.5 + state.camera.y;
+        const wp = isoToWorld(worldX, worldY);
+        for (const npc of state.townNpcs) {
+          if (dist(wp.x, wp.y, npc.x, npc.y) <= 1.65) {
+            openTownNpcDrawer(npc.id);
+            return;
+          }
+        }
+        return;
+      }
+
       // 1. Check tappable ground item nameplates first
       for (let i = state.lootDrops.length - 1; i >= 0; i--) {
         const d = state.lootDrops[i];
-        if (!d.screenRect) continue;
+        if (!d.screenRect || !passesLootFilter(d)) continue;
         if (sx >= d.screenRect.x && sx <= d.screenRect.x + d.screenRect.w &&
             sy >= d.screenRect.y && sy <= d.screenRect.y + d.screenRect.h) {
           if (dist(state.player.x, state.player.y, d.x, d.y) <= 4.5) {
@@ -1498,7 +2103,7 @@
         }
       }
 
-      // 2. Otherwise aim toward click & slash
+      // 2. Otherwise aim toward click & attack
       const worldX = sx - rect.width * 0.5 + state.camera.x;
       const worldY = sy - rect.height * 0.5 + state.camera.y;
       const wp = isoToWorld(worldX, worldY);
@@ -1507,9 +2112,51 @@
       const len = Math.hypot(dx, dy) || 1;
       input.aimX = dx / len;
       input.aimY = dy / len;
-      performSwordSlash();
+      performBasicAttack();
       input.aimX = null;
       input.aimY = null;
+    });
+
+    // Main Menu & Character Creation
+    dom.btnContinueTown.addEventListener('click', () => {
+      sfx.unlock();
+      enterTown();
+    });
+    dom.btnOpenCharCreate.addEventListener('click', () => {
+      sfx.unlock();
+      setScreen('CHAR_CREATE');
+    });
+    dom.btnCharCreateBack.addEventListener('click', () => setScreen('MAIN_MENU'));
+    dom.btnRandomName.addEventListener('click', () => {
+      sfx.unlock();
+      dom.heroNameInput.value = GOTHIC_NAMES[Math.floor(Math.random() * GOTHIC_NAMES.length)];
+    });
+    dom.btnForgeHero.addEventListener('click', () => {
+      sfx.unlock();
+      createNewHero(dom.heroNameInput.value, state.selectedCreateClass);
+    });
+
+    const toggleMuteAll = () => {
+      sfx.muted = !sfx.muted;
+      if (!sfx.muted) sfx.unlock();
+      savePrefs();
+      syncAudioToggleLabels();
+    };
+    dom.btnAudioToggle.addEventListener('click', toggleMuteAll);
+    dom.btnHudAudio.addEventListener('click', toggleMuteAll);
+
+    // Town Quick Dock & NPC Drawer
+    dom.btnTownForge.addEventListener('click', () => { sfx.unlock(); openTownNpcDrawer('blacksmith'); });
+    dom.btnTownStash.addEventListener('click', () => { sfx.unlock(); openTownNpcDrawer('stash'); });
+    dom.btnTownApothecary.addEventListener('click', () => { sfx.unlock(); openTownNpcDrawer('apothecary'); });
+    dom.btnTownWaypoint.addEventListener('click', () => { sfx.unlock(); openTownNpcDrawer('waypoint'); });
+    dom.btnTownMenu.addEventListener('click', () => {
+      saveHeroProfile();
+      setScreen('MAIN_MENU');
+    });
+    dom.btnCloseTownNpc.addEventListener('click', () => dom.townNpcDrawer.close());
+    dom.townNpcDrawer.addEventListener('click', (e) => {
+      if (e.target === dom.townNpcDrawer) dom.townNpcDrawer.close();
     });
 
     // Top-right & modal controls
@@ -1519,12 +2166,30 @@
       if (e.target === dom.inventoryDrawer) toggleInventory(false);
     });
 
+    dom.btnTownPortal.addEventListener('click', () => {
+      sfx.unlock();
+      sfx.portal();
+      enterTown();
+    });
+
+    dom.btnLootFilter.addEventListener('click', () => {
+      sfx.unlock();
+      const idx = LOOT_FILTER_MODES.indexOf(state.lootFilter);
+      state.lootFilter = LOOT_FILTER_MODES[(idx + 1) % LOOT_FILTER_MODES.length];
+      dom.lootFilterLabel.textContent = LOOT_FILTER_LABELS[state.lootFilter];
+      savePrefs();
+      showToast(`Filter: ${LOOT_FILTER_LABELS[state.lootFilter]}`);
+    });
+
     dom.btnNewFloor.addEventListener('click', () => {
       sfx.unlock();
+      if (state.mode === 'TOWN') {
+        openTownNpcDrawer('waypoint');
+        return;
+      }
       const nextFloor = state.stairs.unlocked ? state.floor + 1 : state.floor;
       const nextSeed = Math.floor(1000 + Math.random() * 8999);
-      generateDungeon(nextSeed, nextFloor);
-      saveProgress();
+      enterDungeonFloor(nextSeed, nextFloor);
     });
 
     dom.btnRespawn.addEventListener('click', () => {
@@ -1560,6 +2225,7 @@
     let bestIdx = -1;
     let bestD = 3.2;
     for (let i = 0; i < state.lootDrops.length; i++) {
+      if (!passesLootFilter(state.lootDrops[i])) continue;
       const d = dist(state.player.x, state.player.y, state.lootDrops[i].x, state.lootDrops[i].y);
       if (d < bestD) {
         bestD = d;
@@ -1572,20 +2238,16 @@
   function respawnAtWaypoint(reroll) {
     const p = state.player;
     p.dead = false;
+    p.chillTimer = 0;
     p.hp = p.maxHp;
     p.mp = p.maxMp;
     dom.deathOverlay.classList.add('hidden');
     if (reroll) {
-      generateDungeon(Math.floor(1000 + Math.random() * 8999), state.floor);
+      enterDungeonFloor(Math.floor(1000 + Math.random() * 8999), state.floor);
     } else {
-      p.x = state.waypoint.x - 0.7;
-      p.y = state.waypoint.y + 0.7;
-      const camIso = worldToIso(p.x, p.y);
-      state.camera.x = camIso.x;
-      state.camera.y = camIso.y;
-      updateFogOfWar();
+      enterTown();
     }
-    updateHud();
+    updateHud(true);
   }
 
   // =========================================================================
@@ -1601,15 +2263,16 @@
     p.attackAnim = Math.max(0, p.attackAnim - dt);
     p.castAnim = Math.max(0, p.castAnim - dt);
     p.hitFlash = Math.max(0, p.hitFlash - dt);
+    p.chillTimer = Math.max(0, p.chillTimer - dt);
     for (const s of [1, 2, 3]) {
       p.skillCds[s] = Math.max(0, p.skillCds[s] - dt);
     }
 
     // Passive Mana & Waypoint Sanctum Regeneration
-    p.mp = Math.min(p.maxMp, p.mp + 4.5 * dt);
-    if (dist(p.x, p.y, state.waypoint.x, state.waypoint.y) <= 2.2) {
-      p.hp = Math.min(p.maxHp, p.hp + 16 * dt);
-      p.mp = Math.min(p.maxMp, p.mp + 14 * dt);
+    p.mp = Math.min(p.maxMp, p.mp + (state.mode === 'TOWN' ? 28 : 4.5) * dt);
+    if (state.mode === 'TOWN' || dist(p.x, p.y, state.waypoint.x, state.waypoint.y) <= 2.2) {
+      p.hp = Math.min(p.maxHp, p.hp + 18 * dt);
+      p.mp = Math.min(p.maxMp, p.mp + 16 * dt);
     }
 
     // Screen-space input vector (keyboard + virtual thumbstick)
@@ -1632,7 +2295,6 @@
           collectLootDrop(idx);
           state.pendingLootTarget = null;
         } else {
-          // Convert world direction back to screen-space input
           const isoDir = worldToIso(state.pendingLootTarget.x - p.x, state.pendingLootTarget.y - p.y);
           const il = Math.hypot(isoDir.x, isoDir.y) || 1;
           sx = isoDir.x / il;
@@ -1645,14 +2307,13 @@
     if (len > 0.08) {
       const nsx = sx / Math.max(1, len);
       const nsy = sy / Math.max(1, len);
-      // Map screen-aligned X/Y into 2:1 isometric world axes
       let wx = nsx + nsy;
       let wy = nsy - nsx;
       const wLen = Math.hypot(wx, wy) || 1;
       wx /= wLen;
       wy /= wLen;
 
-      const speed = 4.65;
+      const speed = getHeroStats().speed;
       p.vx = wx * speed;
       p.vy = wy * speed;
       p.facingX = wx;
@@ -1666,15 +2327,23 @@
       p.vy = 0;
     }
 
+    if (state.mode === 'TOWN') return;
+
     // Iron Gates smoothly lift open as hero approaches
     for (const g of state.gates) {
       const near = dist(p.x, p.y, g.x, g.y) <= 2.7;
-      if (near && !g.isOpen) {
-        g.isOpen = true;
-      }
-      if (g.isOpen && g.open < 1) {
-        g.open = Math.min(1, g.open + dt * 3.2);
-      }
+      if (near && !g.isOpen) g.isOpen = true;
+      if (g.isOpen && g.open < 1) g.open = Math.min(1, g.open + dt * 3.2);
+    }
+
+    // Arm Waypoint return-to-town once player steps away from spawn
+    const wpDist = dist(p.x, p.y, state.waypoint.x, state.waypoint.y);
+    if (!state.waypointArmed && wpDist > 2.6) state.waypointArmed = true;
+    else if (state.waypointArmed && wpDist <= 0.95) {
+      state.waypointArmed = false;
+      sfx.portal();
+      enterTown();
+      return;
     }
 
     // Auto-pickup nearby Gold Coins & Health Potions
@@ -1689,15 +2358,18 @@
     // Descent Stairs Transition when unlocked
     if (state.stairs.unlocked && dist(p.x, p.y, state.stairs.x, state.stairs.y) <= 1.05) {
       const nextFloor = state.floor + 1;
+      state.highestFloor = Math.max(state.highestFloor, nextFloor);
       const nextSeed = Math.floor(1000 + Math.random() * 8999);
-      generateDungeon(nextSeed, nextFloor);
-      saveProgress();
+      enterDungeonFloor(nextSeed, nextFloor);
     }
   }
 
   function updateMonsters(dt) {
+    if (state.mode === 'TOWN') {
+      dom.bossBar.classList.add('hidden');
+      return;
+    }
     const p = state.player;
-    const stats = getHeroStats();
     let activeBoss = null;
 
     for (let i = 0; i < state.monsters.length; i++) {
@@ -1705,6 +2377,10 @@
       m.hitFlash = Math.max(0, m.hitFlash - dt);
       m.stunTimer = Math.max(0, m.stunTimer - dt);
       m.atkCd = Math.max(0, m.atkCd - dt);
+
+      if (m.affixes && m.affixes.includes('molten') && Math.random() < dt * 4.5) {
+        spawnParticles(m.x, m.y, '#f97316', 1, 0.9, 10);
+      }
 
       // Apply knockback decay
       if (Math.hypot(m.vx, m.vy) > 0.05) {
@@ -1731,7 +2407,7 @@
           state.novaWaves.push({ x: m.x, y: m.y, r: 0.4, maxR: 2.4, color: '#ef4444', life: 0.3, maxLife: 0.3 });
           state.camera.shake = Math.max(state.camera.shake, 6);
           if (dist(m.x, m.y, p.x, p.y) <= 2.4) {
-            damagePlayer(Math.round(m.atk * 1.45));
+            damagePlayer(Math.round(m.atk * 1.45), m);
           }
           m.atkCd = m.atkCdMax;
         }
@@ -1739,7 +2415,6 @@
       }
 
       if (d > m.range) {
-        // Separation force from sibling monsters
         let sepX = 0;
         let sepY = 0;
         for (let j = 0; j < state.monsters.length; j++) {
@@ -1759,7 +2434,7 @@
           m.slamTelegraph = 0.65;
         } else {
           m.atkCd = m.atkCdMax;
-          damagePlayer(m.atk);
+          damagePlayer(m.atk, m);
         }
       }
     }
@@ -1767,19 +2442,20 @@
     // Toggle Boss Bar
     if (activeBoss) {
       dom.bossBar.classList.remove('hidden');
-      dom.bossName.textContent = activeBoss.name;
+      const affStr = activeBoss.affixes?.length
+        ? ` [${activeBoss.affixes.map((a) => ELITE_AFFIXES[a]?.label || a).join(' • ')}]`
+        : '';
+      dom.bossName.textContent = activeBoss.name + affStr;
       dom.bossHpText.textContent = `${Math.max(0, activeBoss.hp)} / ${activeBoss.maxHp}`;
       dom.bossHpFill.style.width = `${clamp((activeBoss.hp / activeBoss.maxHp) * 100, 0, 100)}%`;
     } else {
       dom.bossBar.classList.add('hidden');
     }
-
-    void stats;
   }
 
-  function damagePlayer(rawDmg) {
+  function damagePlayer(rawDmg, attacker = null) {
     const p = state.player;
-    if (p.dead) return;
+    if (p.dead || state.mode === 'TOWN') return;
     const stats = getHeroStats();
     const mitigated = Math.max(2, Math.round(rawDmg - stats.arm * 0.45));
     p.hp = Math.max(0, p.hp - mitigated);
@@ -1788,23 +2464,38 @@
     addFloatText(p.x, p.y, `-${mitigated}`, '#ef4444', false);
     spawnParticles(p.x, p.y, '#dc2626', 6, 2.0);
 
+    if (attacker && attacker.affixes) {
+      if (attacker.affixes.includes('vampiric')) {
+        const leach = Math.max(2, Math.round(mitigated * 0.35));
+        attacker.hp = Math.min(attacker.maxHp, attacker.hp + leach);
+        addFloatText(attacker.x, attacker.y, `+${leach}`, '#f43f5e', false);
+      }
+      if (attacker.affixes.includes('frozen')) {
+        p.chillTimer = 2.0;
+      }
+    }
+
     if (p.hp <= 0) {
       p.dead = true;
-      dom.deathSummary.textContent = `Slain on Floor ${state.floor} • Level ${p.level} Paladin (${p.kills} foes vanquished).`;
+      const clsName = HERO_CLASSES[state.heroClass]?.name || 'Hero';
+      dom.deathSummary.textContent = `${state.heroName} slain on Floor ${state.floor} • Lv ${p.level} ${clsName} (${p.kills} vanquished).`;
       dom.deathOverlay.classList.remove('hidden');
     }
     updateHud();
   }
 
   function updateEffectsAndLoot(dt) {
-    // Projectiles (Fireball)
+    const p = state.player;
+
+    // Projectiles (Fireball, Shadow Bolt, Frost Orb, Rogue Bolts)
     for (let i = state.projectiles.length - 1; i >= 0; i--) {
       const pr = state.projectiles[i];
       pr.life -= dt;
       pr.x += pr.vx * dt;
       pr.y += pr.vy * dt;
-      if (Math.random() < 0.6) {
-        spawnParticles(pr.x, pr.y, '#f97316', 1, 0.8, 18);
+      if (Math.random() < 0.5) {
+        const pCol = pr.kind === 'frost' ? '#38bdf8' : pr.kind === 'shadow' ? '#c084fc' : pr.kind === 'bolt' ? '#4ade80' : '#f97316';
+        spawnParticles(pr.x, pr.y, pCol, 1, 0.7, 18);
       }
 
       let hit = !isPositionClear(pr.x, pr.y, 0.16) || pr.life <= 0;
@@ -1818,23 +2509,44 @@
       }
 
       if (hit) {
-        state.novaWaves.push({ x: pr.x, y: pr.y, r: 0.25, maxR: 2.0, color: '#f97316', life: 0.24, maxLife: 0.24 });
-        spawnParticles(pr.x, pr.y, '#fb923c', 14, 3.4, 16);
-        state.camera.shake = Math.max(state.camera.shake, 4);
+        const aoeR = pr.aoe || 2.0;
+        const wCol = pr.kind === 'frost' ? '#38bdf8' : pr.kind === 'shadow' ? '#c084fc' : pr.kind === 'bolt' ? '#4ade80' : '#f97316';
+        state.novaWaves.push({ x: pr.x, y: pr.y, r: 0.25, maxR: aoeR, color: wCol, life: 0.22, maxLife: 0.22 });
+        spawnParticles(pr.x, pr.y, wCol, 10, 3.0, 16);
+        if (aoeR >= 1.5) state.camera.shake = Math.max(state.camera.shake, 3.5);
         for (let j = state.monsters.length - 1; j >= 0; j--) {
           const m = state.monsters[j];
           const d = dist(pr.x, pr.y, m.x, m.y);
-          if (d <= 2.0 + m.radius) {
+          if (d <= aoeR + m.radius) {
+            if (pr.kind === 'frost') m.stunTimer = Math.max(m.stunTimer, 0.95);
             damageMonster(m, pr.dmg, (m.x - pr.x) / (d || 1), (m.y - pr.y) / (d || 1), true);
           }
         }
-        breakNearbyProps(pr.x, pr.y, 1.9);
+        breakNearbyProps(pr.x, pr.y, aoeR);
         state.projectiles.splice(i, 1);
       }
     }
 
-    // Loot Drop parabolic bounce
-    for (const d of state.lootDrops) {
+    // Rogue Poison Trap Clouds
+    for (let i = state.poisonClouds.length - 1; i >= 0; i--) {
+      const pc = state.poisonClouds[i];
+      pc.life -= dt;
+      pc.tick -= dt;
+      if (pc.tick <= 0) {
+        pc.tick = 0.5;
+        for (let j = state.monsters.length - 1; j >= 0; j--) {
+          const m = state.monsters[j];
+          if (dist(pc.x, pc.y, m.x, m.y) <= pc.r + m.radius) {
+            damageMonster(m, pc.dmg, 0, 0, false);
+          }
+        }
+      }
+      if (pc.life <= 0) state.poisonClouds.splice(i, 1);
+    }
+
+    // Loot Drop parabolic bounce + Auto-Loot Gold Magnet (within 90px screen distance)
+    for (let i = state.lootDrops.length - 1; i >= 0; i--) {
+      const d = state.lootDrops[i];
       d.age += dt;
       if (d.z > 0 || d.vz > 0) {
         d.x += (d.destX - d.x) * Math.min(1, dt * 6);
@@ -1846,6 +2558,21 @@
           d.vz = 0;
           d.x = d.destX;
           d.y = d.destY;
+        }
+      } else if (d.kind === 'gold' && !p.dead) {
+        const dx = p.x - d.x;
+        const dy = p.y - d.y;
+        const isoDx = (dx - dy) * (TILE_W * 0.5);
+        const isoDy = (dx + dy) * (TILE_H * 0.5);
+        const pxDist = Math.hypot(isoDx, isoDy);
+        if (pxDist <= 90) {
+          const wDist = Math.hypot(dx, dy) || 1;
+          const pull = Math.min(wDist, 9.5 * dt);
+          d.x += (dx / wDist) * pull;
+          d.y += (dy / wDist) * pull;
+          d.destX = d.x;
+          d.destY = d.y;
+          if (wDist <= 0.65) collectLootDrop(i);
         }
       }
     }
@@ -1897,28 +2624,57 @@
   }
 
   // =========================================================================
-  // ISOMETRIC RENDERER (DEPTH-SORTED PASSES)
+  // ISOMETRIC RENDERER (CAMERA FRUSTUM CULLED + LOW-GC)
   // =========================================================================
+  const drawPool = [];
+  let vignetteCanvas = null;
+
+  function rebuildVignetteCache(viewW, viewH) {
+    if (!viewW || !viewH) return;
+    vignetteCanvas = makeCanvas(viewW, viewH);
+    const vc = vignetteCanvas.getContext('2d');
+    const vig = vc.createRadialGradient(
+      viewW * 0.5, viewH * 0.5, Math.min(viewW, viewH) * 0.26,
+      viewW * 0.5, viewH * 0.5, Math.max(viewW, viewH) * 0.72
+    );
+    vig.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    vig.addColorStop(1, 'rgba(4, 5, 8, 0.65)');
+    vc.fillStyle = vig;
+    vc.fillRect(0, 0, viewW, viewH);
+  }
+
   function renderIsometricWorld(now) {
     const viewW = canvas.clientWidth;
     const viewH = canvas.clientHeight;
     if (!viewW || !viewH) return;
 
-    ctx.clearRect(0, 0, viewW, viewH);
     ctx.fillStyle = '#07080c';
     ctx.fillRect(0, 0, viewW, viewH);
 
-    const shakeX = (Math.random() - 0.5) * state.camera.shake * 2;
-    const shakeY = (Math.random() - 0.5) * state.camera.shake * 2;
+    const shakeX = state.camera.shake > 0.05 ? (Math.random() - 0.5) * state.camera.shake * 2 : 0;
+    const shakeY = state.camera.shake > 0.05 ? (Math.random() - 0.5) * state.camera.shake * 2 : 0;
     const offX = viewW * 0.5 - state.camera.x + shakeX;
     const offY = viewH * 0.5 - state.camera.y + shakeY;
 
-    // Pass 1: Explored Ground Tiles
-    for (let y = 0; y < MAP_H; y++) {
-      for (let x = 0; x < MAP_W; x++) {
-        const exp = state.explored[y][x];
+    // Camera Frustum Culling: convert 4 screen corners to world tile bounds (+2 margin)
+    const c1 = isoToWorld(-offX, -offY);
+    const c2 = isoToWorld(viewW - offX, -offY);
+    const c3 = isoToWorld(-offX, viewH - offY);
+    const c4 = isoToWorld(viewW - offX, viewH - offY);
+    const minTileX = Math.max(0, Math.floor(Math.min(c1.x, c2.x, c3.x, c4.x)) - 2);
+    const maxTileX = Math.min(MAP_W - 1, Math.ceil(Math.max(c1.x, c2.x, c3.x, c4.x)) + 2);
+    const minTileY = Math.max(0, Math.floor(Math.min(c1.y, c2.y, c3.y, c4.y)) - 2);
+    const maxTileY = Math.min(MAP_H - 1, Math.ceil(Math.max(c1.y, c2.y, c3.y, c4.y)) + 2);
+
+    // Pass 1: Explored Ground Tiles (Culled)
+    for (let y = minTileY; y <= maxTileY; y++) {
+      const rowExp = state.explored[y];
+      const rowGrid = state.grid[y];
+      const rowVar = state.tileVariant[y];
+      for (let x = minTileX; x <= maxTileX; x++) {
+        const exp = rowExp[x];
         if (!exp) continue;
-        const t = state.grid[y][x];
+        const t = rowGrid[x];
         if (t !== TILE.FLOOR && t !== TILE.SANCTUM && t !== TILE.BOSS_FLOOR) continue;
 
         const iso = worldToIso(x + 0.5, y + 0.5);
@@ -1930,49 +2686,56 @@
           ? atlas.sanctum
           : t === TILE.BOSS_FLOOR
             ? atlas.bossFloor
-            : atlas.floors[state.tileVariant[y][x] % atlas.floors.length];
+            : atlas.floors[rowVar[x] % atlas.floors.length];
 
         ctx.drawImage(sprite, sx - TILE_W * 0.5 - 1, sy - TILE_H * 0.5 - 1);
         if (exp === 1) {
-          ctx.fillStyle = 'rgba(4, 5, 9, 0.52)';
+          ctx.fillStyle = 'rgba(4, 5, 9, 0.5)';
           drawIsoDiamondPath(ctx, sx, sy, TILE_W, TILE_H);
           ctx.fill();
         }
       }
     }
 
-    // Pass 1b: Ground Light Pools (Torches, Waypoint Portal, Descent Stairs, Nova Waves)
+    // Pass 1b: Pre-rendered Ground Light Pools (zero per-frame gradient allocations)
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    for (const tc of state.torches) {
-      const exp = state.explored[Math.floor(tc.y)]?.[Math.floor(tc.x)];
-      if (!exp) continue;
+    for (let i = 0; i < state.torches.length; i++) {
+      const tc = state.torches[i];
+      if (tc.x < minTileX || tc.x > maxTileX || tc.y < minTileY || tc.y > maxTileY) continue;
+      if (!state.explored[Math.floor(tc.y)]?.[Math.floor(tc.x)]) continue;
       const iso = worldToIso(tc.x, tc.y);
       const sx = iso.x + offX;
       const sy = iso.y + offY;
-      if (sx < -140 || sx > viewW + 140 || sy < -140 || sy > viewH + 140) continue;
-      const flicker = 0.88 + Math.sin(now * 0.009 + tc.phase) * 0.12;
-      const r = 74 * flicker;
-      const g = ctx.createRadialGradient(sx, sy - 6, 4, sx, sy - 6, r);
-      if (tc.isArcane) {
-        g.addColorStop(0, 'rgba(59, 130, 246, 0.28)');
-        g.addColorStop(1, 'rgba(59, 130, 246, 0)');
-      } else {
-        g.addColorStop(0, 'rgba(249, 115, 22, 0.25)');
-        g.addColorStop(0.5, 'rgba(217, 119, 6, 0.11)');
-        g.addColorStop(1, 'rgba(0, 0, 0, 0)');
-      }
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.ellipse(sx, sy - 6, r, r * 0.55, 0, 0, Math.PI * 2);
-      ctx.fill();
+      if (sx < -120 || sx > viewW + 120 || sy < -120 || sy > viewH + 120) continue;
+      const sprite = tc.isArcane ? atlas.arcaneGlow : atlas.torchGlow;
+      const flicker = 0.9 + Math.sin(now * 0.008 + tc.phase) * 0.1;
+      const rw = 148 * flicker;
+      const rh = 82 * flicker;
+      ctx.drawImage(sprite, sx - rw * 0.5, sy - 6 - rh * 0.5, rw, rh);
     }
     ctx.restore();
 
     drawWaypointAndStairs(offX, offY, now);
 
+    // Poison Trap Clouds (Rogue)
+    for (let i = 0; i < state.poisonClouds.length; i++) {
+      const pc = state.poisonClouds[i];
+      const iso = worldToIso(pc.x, pc.y);
+      ctx.save();
+      ctx.fillStyle = 'rgba(34, 197, 94, 0.22)';
+      ctx.strokeStyle = 'rgba(74, 222, 128, 0.6)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(iso.x + offX, iso.y + offY, pc.r * 32, pc.r * 16, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+
     // Nova rings on ground
-    for (const w of state.novaWaves) {
+    for (let i = 0; i < state.novaWaves.length; i++) {
+      const w = state.novaWaves[i];
       const iso = worldToIso(w.x, w.y);
       const alpha = clamp(w.life / w.maxLife, 0, 1);
       ctx.save();
@@ -1985,96 +2748,110 @@
       ctx.restore();
     }
 
-    // Pass 2: Build Depth-Sorted Drawables (col + row painter's algorithm)
-    const drawList = [];
+    // Pass 2: Depth-Sorted Drawables using pooled objects (no closure allocations)
+    let drawLen = 0;
+    const pushDraw = (depth, kind, sx, sy, ref, extra) => {
+      let item = drawPool[drawLen];
+      if (!item) {
+        item = { depth: 0, kind: 0, sx: 0, sy: 0, ref: null, extra: 0 };
+        drawPool[drawLen] = item;
+      }
+      item.depth = depth;
+      item.kind = kind;
+      item.sx = sx;
+      item.sy = sy;
+      item.ref = ref;
+      item.extra = extra;
+      drawLen++;
+    };
 
-    for (let y = 0; y < MAP_H; y++) {
-      for (let x = 0; x < MAP_W; x++) {
-        if (!state.explored[y][x] || state.grid[y][x] !== TILE.WALL) continue;
+    for (let y = minTileY; y <= maxTileY; y++) {
+      const rowExp = state.explored[y];
+      const rowGrid = state.grid[y];
+      for (let x = minTileX; x <= maxTileX; x++) {
+        const exp = rowExp[x];
+        if (!exp || rowGrid[x] !== TILE.WALL) continue;
         const iso = worldToIso(x + 0.5, y + 0.5);
         const sx = iso.x + offX;
         const sy = iso.y + offY;
         if (sx < -80 || sx > viewW + 80 || sy < -100 || sy > viewH + 100) continue;
-        drawList.push({
-          depth: x + y + 0.5,
-          draw: () => {
-            ctx.drawImage(atlas.wall, sx - TILE_W * 0.5 - 1, sy - TILE_H * 0.5 - WALL_H - 1);
-            if (state.explored[y][x] === 1) {
-              ctx.fillStyle = 'rgba(4, 5, 9, 0.45)';
-              ctx.fillRect(sx - TILE_W * 0.5, sy - TILE_H * 0.5 - WALL_H, TILE_W, TILE_H + WALL_H);
-            }
-          }
-        });
+        pushDraw(x + y + 0.5, 1, sx, sy, null, exp);
       }
     }
 
-    // Wall Torches
-    for (const tc of state.torches) {
+    for (let i = 0; i < state.torches.length; i++) {
+      const tc = state.torches[i];
+      if (tc.x < minTileX || tc.x > maxTileX || tc.y < minTileY || tc.y > maxTileY) continue;
       if (!state.explored[Math.floor(tc.y)]?.[Math.floor(tc.x)]) continue;
       const iso = worldToIso(tc.x, tc.y);
-      const sx = iso.x + offX;
-      const sy = iso.y + offY;
-      drawList.push({
-        depth: tc.x + tc.y,
-        draw: () => drawTorch(sx, sy, now, tc.phase, tc.isArcane)
-      });
+      pushDraw(tc.x + tc.y, 2, iso.x + offX, iso.y + offY, tc, 0);
     }
 
-    // Iron Gates
-    for (const g of state.gates) {
+    for (let i = 0; i < state.gates.length; i++) {
+      const g = state.gates[i];
+      if (g.x < minTileX || g.x > maxTileX || g.y < minTileY || g.y > maxTileY) continue;
       if (!state.explored[Math.floor(g.y)]?.[Math.floor(g.x)]) continue;
       const iso = worldToIso(g.x, g.y);
-      drawList.push({
-        depth: g.x + g.y,
-        draw: () => drawIronGate(iso.x + offX, iso.y + offY, g)
-      });
+      pushDraw(g.x + g.y, 3, iso.x + offX, iso.y + offY, g, 0);
     }
 
-    // Destructible Urns & Barrels
-    for (const pr of state.props) {
-      if (pr.broken) continue;
+    for (let i = 0; i < state.props.length; i++) {
+      const pr = state.props[i];
+      if (pr.broken || pr.x < minTileX || pr.x > maxTileX || pr.y < minTileY || pr.y > maxTileY) continue;
       if (!state.explored[Math.floor(pr.y)]?.[Math.floor(pr.x)]) continue;
       const iso = worldToIso(pr.x, pr.y);
-      const sprite = pr.kind === 'urn' ? atlas.urn : atlas.barrel;
-      drawList.push({
-        depth: pr.x + pr.y,
-        draw: () => ctx.drawImage(sprite, iso.x + offX - 18, iso.y + offY - 34)
-      });
+      pushDraw(pr.x + pr.y, 4, iso.x + offX, iso.y + offY, pr, 0);
     }
 
-    // Loot Drops (Vertical Rarity Beams + Icons)
-    for (const d of state.lootDrops) {
+    for (let i = 0; i < state.townNpcs.length; i++) {
+      const npc = state.townNpcs[i];
+      const iso = worldToIso(npc.x, npc.y);
+      pushDraw(npc.x + npc.y, 8, iso.x + offX, iso.y + offY, npc, 0);
+    }
+
+    for (let i = 0; i < state.lootDrops.length; i++) {
+      const d = state.lootDrops[i];
+      if (d.x < minTileX || d.x > maxTileX || d.y < minTileY || d.y > maxTileY) continue;
       const iso = worldToIso(d.x, d.y);
-      drawList.push({
-        depth: d.x + d.y,
-        draw: () => drawLootGroundVisual(iso.x + offX, iso.y + offY - d.z, d, now)
-      });
+      pushDraw(d.x + d.y, 5, iso.x + offX, iso.y + offY - d.z, d, 0);
     }
 
-    // Monsters (visible tiles only)
-    for (const m of state.monsters) {
+    for (let i = 0; i < state.monsters.length; i++) {
+      const m = state.monsters[i];
+      if (m.x < minTileX || m.x > maxTileX || m.y < minTileY || m.y > maxTileY) continue;
       if (state.explored[Math.floor(m.y)]?.[Math.floor(m.x)] !== 2) continue;
       const iso = worldToIso(m.x, m.y);
-      drawList.push({
-        depth: m.x + m.y,
-        draw: () => drawMonster(iso.x + offX, iso.y + offY, m, now)
-      });
+      pushDraw(m.x + m.y, 6, iso.x + offX, iso.y + offY, m, 0);
     }
 
-    // Armored Paladin Hero
     const pIso = worldToIso(state.player.x, state.player.y);
-    drawList.push({
-      depth: state.player.x + state.player.y,
-      draw: () => drawPaladin(pIso.x + offX, pIso.y + offY, now)
-    });
+    pushDraw(state.player.x + state.player.y, 7, pIso.x + offX, pIso.y + offY, null, 0);
 
-    drawList.sort((a, b) => a.depth - b.depth);
-    for (let i = 0; i < drawList.length; i++) {
-      drawList[i].draw();
+    drawPool.length = drawLen;
+    drawPool.sort((a, b) => a.depth - b.depth);
+    for (let i = 0; i < drawLen; i++) {
+      const it = drawPool[i];
+      switch (it.kind) {
+        case 1:
+          ctx.drawImage(atlas.wall, it.sx - TILE_W * 0.5 - 1, it.sy - TILE_H * 0.5 - WALL_H - 1);
+          if (it.extra === 1) {
+            ctx.fillStyle = 'rgba(4, 5, 9, 0.45)';
+            ctx.fillRect(it.sx - TILE_W * 0.5, it.sy - TILE_H * 0.5 - WALL_H, TILE_W, TILE_H + WALL_H);
+          }
+          break;
+        case 2: drawTorch(it.sx, it.sy, now, it.ref.phase, it.ref.isArcane); break;
+        case 3: drawIronGate(it.sx, it.sy, it.ref); break;
+        case 4: ctx.drawImage(it.ref.kind === 'urn' ? atlas.urn : atlas.barrel, it.sx - 18, it.sy - 34); break;
+        case 5: drawLootGroundVisual(it.sx, it.sy, it.ref, now); break;
+        case 6: drawMonster(it.sx, it.sy, it.ref, now); break;
+        case 7: drawPaladin(it.sx, it.sy, now); break;
+        case 8: drawTownNpc(it.sx, it.sy, it.ref, now); break;
+      }
     }
 
-    // Pass 3: Slash Arcs, Fireball Projectiles & Particles
-    for (const s of state.slashArcs) {
+    // Pass 3: Slash Arcs, Projectiles & Particles
+    for (let i = 0; i < state.slashArcs.length; i++) {
+      const s = state.slashArcs[i];
       const iso = worldToIso(s.x, s.y);
       const sx = iso.x + offX;
       const sy = iso.y + offY - 20;
@@ -2098,21 +2875,23 @@
       ctx.restore();
     }
 
-    for (const pr of state.projectiles) {
+    for (let i = 0; i < state.projectiles.length; i++) {
+      const pr = state.projectiles[i];
       const iso = worldToIso(pr.x, pr.y);
       const sx = iso.x + offX;
       const sy = iso.y + offY - 18;
-      const g = ctx.createRadialGradient(sx, sy, 2, sx, sy, 14);
-      g.addColorStop(0, '#fef08a');
-      g.addColorStop(0.45, '#f97316');
-      g.addColorStop(1, 'rgba(220, 38, 38, 0)');
-      ctx.fillStyle = g;
+      ctx.fillStyle = pr.kind === 'frost' ? '#38bdf8' : pr.kind === 'shadow' ? '#c084fc' : pr.kind === 'bolt' ? '#4ade80' : '#f97316';
       ctx.beginPath();
-      ctx.arc(sx, sy, 14, 0, Math.PI * 2);
+      ctx.arc(sx, sy, pr.kind === 'bolt' ? 5 : 9, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(sx, sy, pr.kind === 'bolt' ? 2.2 : 4, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    for (const pt of state.particles) {
+    for (let i = 0; i < state.particles.length; i++) {
+      const pt = state.particles[i];
       const iso = worldToIso(pt.x, pt.y);
       ctx.globalAlpha = clamp(pt.life / pt.maxLife, 0, 1);
       ctx.fillStyle = pt.color;
@@ -2122,23 +2901,67 @@
     }
     ctx.globalAlpha = 1;
 
-    // Pass 4: Atmospheric Torchlit Vignette
-    const vig = ctx.createRadialGradient(
-      viewW * 0.5,
-      viewH * 0.5,
-      Math.min(viewW, viewH) * 0.24,
-      viewW * 0.5,
-      viewH * 0.5,
-      Math.max(viewW, viewH) * 0.72
-    );
-    vig.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    vig.addColorStop(1, 'rgba(4, 5, 8, 0.68)');
-    ctx.fillStyle = vig;
-    ctx.fillRect(0, 0, viewW, viewH);
+    // Pass 4: Cached Atmospheric Torchlit Vignette (zero per-frame gradient)
+    if (vignetteCanvas) {
+      ctx.drawImage(vignetteCanvas, 0, 0, viewW, viewH);
+    }
 
     // Pass 5: Floating Damage Numbers & Tappable Ground Loot Nameplates
     drawFloatingDamageNumbers(offX, offY);
-    drawLootNameplates(offX, offY);
+    if (state.mode === 'DUNGEON') drawLootNameplates(offX, offY);
+  }
+
+  function drawTownNpc(sx, sy, npc, now) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.beginPath();
+    ctx.ellipse(sx, sy + 2, 16, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (npc.id === 'waypoint') {
+      ctx.restore();
+      return;
+    }
+
+    const pulse = Math.sin(now * 0.005) * 1.5;
+    if (npc.id === 'blacksmith') {
+      ctx.fillStyle = '#475569';
+      ctx.fillRect(sx - 10, sy - 16, 20, 12);
+      ctx.fillStyle = '#94a3b8';
+      ctx.fillRect(sx - 14, sy - 20, 28, 6);
+      ctx.fillStyle = '#f97316';
+      ctx.beginPath();
+      ctx.arc(sx, sy - 28 + pulse * 0.5, 5, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (npc.id === 'stash') {
+      ctx.fillStyle = '#78350f';
+      ctx.fillRect(sx - 12, sy - 18, 24, 16);
+      ctx.strokeStyle = '#facc15';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(sx - 12, sy - 18, 24, 16);
+      ctx.fillStyle = '#fde047';
+      ctx.fillRect(sx - 3, sy - 13, 6, 6);
+    } else if (npc.id === 'apothecary') {
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(sx - 11, sy - 18, 22, 16);
+      ctx.fillStyle = '#22c55e';
+      ctx.beginPath();
+      ctx.arc(sx - 4, sy - 24 + pulse * 0.4, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#ef4444';
+      ctx.beginPath();
+      ctx.arc(sx + 5, sy - 22, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.font = '800 10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.strokeStyle = 'rgba(0,0,0,0.9)';
+    ctx.lineWidth = 3;
+    ctx.strokeText(npc.short, sx, sy - 36);
+    ctx.fillStyle = npc.color;
+    ctx.fillText(npc.short, sx, sy - 36);
+    ctx.restore();
   }
 
   function drawWaypointAndStairs(offX, offY, now) {
@@ -2166,8 +2989,8 @@
       ctx.restore();
     }
 
-    // Descent Stairs in Boss Chamber
-    if (state.explored[Math.floor(state.stairs.y)]?.[Math.floor(state.stairs.x)]) {
+    // Descent Stairs in Boss Chamber (Dungeon only)
+    if (state.mode === 'DUNGEON' && state.explored[Math.floor(state.stairs.y)]?.[Math.floor(state.stairs.x)]) {
       const sIso = worldToIso(state.stairs.x, state.stairs.y);
       const sx = sIso.x + offX;
       const sy = sIso.y + offY;
@@ -2229,8 +3052,9 @@
     ctx.restore();
   }
 
-  function drawPaladin(sx, sy, now) {
+  function drawPaladin(sx, sy, now, clsId = state.heroClass) {
     const p = state.player;
+    const cls = HERO_CLASSES[clsId] || HERO_CLASSES.paladin;
     const moving = Math.hypot(p.vx, p.vy) > 0.2;
     const breath = Math.sin(now * 0.005) * 1.4;
     const stride = moving ? Math.sin(p.walkPhase) * 4.2 : 0;
@@ -2243,8 +3067,8 @@
     ctx.fill();
 
     const flash = p.hitFlash > 0;
-    // Crimson Paladin cloak sway
-    ctx.fillStyle = flash ? '#ffffff' : '#7f1d1d';
+    // Class Cloak / Mantle
+    ctx.fillStyle = flash ? '#ffffff' : (p.chillTimer > 0 ? '#0284c7' : cls.cloak);
     ctx.beginPath();
     ctx.moveTo(sx - 8, sy - 26 + breath);
     ctx.lineTo(sx + 8, sy - 26 + breath);
@@ -2258,48 +3082,59 @@
     ctx.fillRect(sx - 6, sy - 11 + stride * 0.45, 5, 10);
     ctx.fillRect(sx + 1, sy - 11 - stride * 0.45, 5, 10);
 
-    // Armored Cuirass
-    ctx.fillStyle = flash ? '#ffffff' : '#94a3b8';
+    // Armored Cuirass / Tunic
+    ctx.fillStyle = flash ? '#ffffff' : cls.armorColor;
     ctx.beginPath();
     ctx.roundRect(sx - 8, sy - 28 + breath, 16, 17, 3);
     ctx.fill();
-    // Gold breastplate trim
-    ctx.fillStyle = '#facc15';
+    ctx.fillStyle = cls.trimColor;
     ctx.fillRect(sx - 1.5, sy - 26 + breath, 3, 12);
 
-    // Greathelm + glowing visor
-    ctx.fillStyle = flash ? '#ffffff' : '#cbd5e1';
+    // Helm / Hood + glowing eyes
+    ctx.fillStyle = flash ? '#ffffff' : (clsId === 'paladin' ? '#cbd5e1' : cls.cloak);
     ctx.beginPath();
     ctx.roundRect(sx - 6.5, sy - 40 + breath, 13, 12, 4);
     ctx.fill();
     ctx.fillStyle = '#0f172a';
     ctx.fillRect(sx - 4.5, sy - 35 + breath, 9, 2.5);
-    ctx.fillStyle = '#fde047';
+    ctx.fillStyle = cls.trimColor;
     ctx.fillRect(sx - 3, sy - 34.5 + breath, 6, 1.5);
 
-    // Kite Shield
-    ctx.fillStyle = '#1e293b';
-    ctx.strokeStyle = '#d97706';
-    ctx.lineWidth = 1.6;
-    ctx.beginPath();
-    ctx.moveTo(sx - 13, sy - 26 + breath);
-    ctx.lineTo(sx - 5, sy - 26 + breath);
-    ctx.lineTo(sx - 6, sy - 14 + breath);
-    ctx.lineTo(sx - 9, sy - 10 + breath);
-    ctx.lineTo(sx - 12, sy - 14 + breath);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
+    if (clsId === 'paladin') {
+      ctx.fillStyle = '#1e293b';
+      ctx.strokeStyle = '#d97706';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(sx - 13, sy - 26 + breath);
+      ctx.lineTo(sx - 5, sy - 26 + breath);
+      ctx.lineTo(sx - 6, sy - 14 + breath);
+      ctx.lineTo(sx - 9, sy - 10 + breath);
+      ctx.lineTo(sx - 12, sy - 14 + breath);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
 
-    // Broadsword + swing pose
     const swingAngle = p.attackAnim > 0 ? -1.4 + (1 - p.attackAnim / 0.24) * 2.4 : (p.castAnim > 0 ? -1.2 : 0.35);
     ctx.save();
     ctx.translate(sx + 8, sy - 20 + breath);
     ctx.rotate(swingAngle);
-    ctx.fillStyle = p.attackAnim > 0 ? '#fef08a' : '#e2e8f0';
-    ctx.fillRect(-1.5, -20, 3, 18);
-    ctx.fillStyle = '#d97706';
-    ctx.fillRect(-5, -3, 10, 2.5);
+    if (clsId === 'sorcerer') {
+      ctx.fillStyle = '#78350f';
+      ctx.fillRect(-1.2, -22, 2.4, 22);
+      ctx.fillStyle = '#c084fc';
+      ctx.beginPath();
+      ctx.arc(0, -23, 3.8, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (clsId === 'rogue') {
+      ctx.fillStyle = p.attackAnim > 0 ? '#86efac' : '#cbd5e1';
+      ctx.fillRect(-1, -15, 2, 13);
+    } else {
+      ctx.fillStyle = p.attackAnim > 0 ? '#fef08a' : '#e2e8f0';
+      ctx.fillRect(-1.5, -20, 3, 18);
+      ctx.fillStyle = '#d97706';
+      ctx.fillRect(-5, -3, 10, 2.5);
+    }
     ctx.restore();
 
     ctx.restore();
@@ -2327,13 +3162,16 @@
       ctx.stroke();
     }
 
-    // Elite blue arcane aura
-    if (isGhoul) {
-      ctx.strokeStyle = `rgba(96, 165, 250, ${0.55 + Math.sin(now * 0.008) * 0.25})`;
-      ctx.lineWidth = 2;
+    // Elite / Affix aura
+    if (isGhoul || (m.affixes && m.affixes.length)) {
+      const affCol = m.affixes?.length ? (ELITE_AFFIXES[m.affixes[0]]?.color || '#60a5fa') : '#60a5fa';
+      ctx.strokeStyle = affCol;
+      ctx.globalAlpha = 0.55 + Math.sin(now * 0.008) * 0.25;
+      ctx.lineWidth = isBoss ? 2.5 : 2;
       ctx.beginPath();
-      ctx.ellipse(sx, sy + 2, 16, 8, 0, 0, Math.PI * 2);
+      ctx.ellipse(sx, sy + 2, isBoss ? 24 : 16, isBoss ? 11 : 8, 0, 0, Math.PI * 2);
       ctx.stroke();
+      ctx.globalAlpha = 1;
     }
 
     // Shadow
@@ -2409,7 +3247,16 @@
       ctx.fillRect(sx + 1.5, sy - 11 - stride * 0.4, 3, 11);
     }
 
-    // Overhead compact HP bar for wounded non-boss foes
+    // Overhead affix tag on Champion Ghouls & compact HP bar
+    if (!isBoss && isGhoul && m.affixes?.length) {
+      const aff = ELITE_AFFIXES[m.affixes[0]];
+      if (aff) {
+        ctx.font = '700 9px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = aff.color;
+        ctx.fillText(aff.label, sx, sy - 50);
+      }
+    }
     if (!isBoss && m.hp < m.maxHp) {
       const bw = 28;
       ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
@@ -2460,7 +3307,7 @@
     ctx.textBaseline = 'middle';
 
     for (const d of state.lootDrops) {
-      if (d.z > 4) {
+      if (d.z > 4 || !passesLootFilter(d)) {
         d.screenRect = null;
         continue;
       }
@@ -2532,46 +3379,37 @@
     const cellW = mw / MAP_W;
     const cellH = mh / MAP_H;
 
+    if (state.fogDirty) rebuildFogAndMinimapCache();
     mctx.clearRect(0, 0, mw, mh);
-    mctx.fillStyle = 'rgba(7, 8, 12, 0.92)';
-    mctx.fillRect(0, 0, mw, mh);
-
-    for (let y = 0; y < MAP_H; y++) {
-      for (let x = 0; x < MAP_W; x++) {
-        const exp = state.explored[y][x];
-        if (!exp) continue;
-        const t = state.grid[y][x];
-        if (t === TILE.WALL) {
-          mctx.fillStyle = exp === 2 ? '#475569' : '#262d3d';
-        } else if (t !== TILE.VOID) {
-          mctx.fillStyle = exp === 2 ? '#1e293b' : '#111622';
-        } else {
-          continue;
-        }
-        mctx.fillRect(x * cellW, y * cellH, Math.ceil(cellW), Math.ceil(cellH));
-      }
-    }
+    mctx.drawImage(minimapStaticCanvas, 0, 0);
 
     // Waypoint
     mctx.fillStyle = '#60a5fa';
     mctx.fillRect(state.waypoint.x * cellW - 2, state.waypoint.y * cellH - 2, 4, 4);
 
-    // Stairs (if explored)
-    if (state.explored[Math.floor(state.stairs.y)]?.[Math.floor(state.stairs.x)]) {
-      mctx.fillStyle = state.stairs.unlocked ? '#facc15' : '#a855f7';
-      mctx.fillRect(state.stairs.x * cellW - 2.5, state.stairs.y * cellH - 2.5, 5, 5);
-    }
+    if (state.mode === 'DUNGEON') {
+      // Stairs (if explored)
+      if (state.explored[Math.floor(state.stairs.y)]?.[Math.floor(state.stairs.x)]) {
+        mctx.fillStyle = state.stairs.unlocked ? '#facc15' : '#a855f7';
+        mctx.fillRect(state.stairs.x * cellW - 2.5, state.stairs.y * cellH - 2.5, 5, 5);
+      }
 
-    // Visible Monsters & Loot
-    for (const m of state.monsters) {
-      if (state.explored[Math.floor(m.y)]?.[Math.floor(m.x)] !== 2) continue;
-      mctx.fillStyle = m.type === 'boss' ? '#f97316' : m.type === 'ghoul' ? '#38bdf8' : '#ef4444';
-      mctx.fillRect(m.x * cellW - 1.5, m.y * cellH - 1.5, m.type === 'boss' ? 4 : 3, m.type === 'boss' ? 4 : 3);
-    }
-    for (const d of state.lootDrops) {
-      if (d.kind === 'gear') {
-        mctx.fillStyle = RARITY[d.rarity]?.color || '#facc15';
-        mctx.fillRect(d.x * cellW - 1, d.y * cellH - 1, 2.5, 2.5);
+      // Visible Monsters & Loot
+      for (const m of state.monsters) {
+        if (state.explored[Math.floor(m.y)]?.[Math.floor(m.x)] !== 2) continue;
+        mctx.fillStyle = m.type === 'boss' ? '#f97316' : m.type === 'ghoul' ? '#38bdf8' : '#ef4444';
+        mctx.fillRect(m.x * cellW - 1.5, m.y * cellH - 1.5, m.type === 'boss' ? 4 : 3, m.type === 'boss' ? 4 : 3);
+      }
+      for (const d of state.lootDrops) {
+        if (d.kind === 'gear' && passesLootFilter(d)) {
+          mctx.fillStyle = RARITY[d.rarity]?.color || '#facc15';
+          mctx.fillRect(d.x * cellW - 1, d.y * cellH - 1, 2.5, 2.5);
+        }
+      }
+    } else {
+      for (const npc of state.townNpcs) {
+        mctx.fillStyle = npc.color;
+        mctx.fillRect(npc.x * cellW - 2, npc.y * cellH - 2, 4, 4);
       }
     }
 
@@ -2583,7 +3421,7 @@
   }
 
   // =========================================================================
-  // HUD & INVENTORY DRAWER UI
+  // HUD, MAIN MENU, CHAR CREATION & TOWN HUB UI
   // =========================================================================
   function showToast(msg) {
     dom.toastBanner.textContent = msg;
@@ -2591,38 +3429,481 @@
     state.toastTimer = 2.6;
   }
 
-  function updateHud() {
+  function syncAudioToggleLabels() {
+    const txt = sfx.muted ? 'SFX: OFF' : 'SFX: ON';
+    if (dom.btnAudioToggle) dom.btnAudioToggle.textContent = txt;
+    if (dom.hudAudioLabel) dom.hudAudioLabel.textContent = txt;
+  }
+
+  function syncHudDom(force = false) {
     const p = state.player;
-    dom.hpOrbFill.style.height = `${clamp((p.hp / p.maxHp) * 100, 0, 100)}%`;
-    dom.mpOrbFill.style.height = `${clamp((p.mp / p.maxMp) * 100, 0, 100)}%`;
-    dom.hpText.textContent = `${Math.ceil(p.hp)}`;
-    dom.mpText.textContent = `${Math.floor(p.mp)}`;
+    const c = state.hudCache;
+    const hpPct = `${clamp((p.hp / p.maxHp) * 100, 0, 100).toFixed(1)}%`;
+    const mpPct = `${clamp((p.mp / p.maxMp) * 100, 0, 100).toFixed(1)}%`;
+    const hpStr = `${Math.ceil(p.hp)}`;
+    const mpStr = `${Math.floor(p.mp)}`;
+    const clsName = HERO_CLASSES[state.heroClass]?.name || 'Paladin';
+    const lvlStr = `Lv ${p.level} ${clsName}`;
+    const goldStr = p.gold.toLocaleString();
+    const xpPct = `${clamp((p.xp / p.nextXp) * 100, 0, 100).toFixed(1)}%`;
+    const floorStr = state.mode === 'TOWN' ? 'Shadowhaven • Town' : `Floor ${state.floor} • Crypt`;
+    const seedStr = `#${state.seed} • v${VERSION}`;
+    const buffStr = state.activeBuff ? state.activeBuff.label : '';
 
-    dom.heroLevelText.textContent = `Lv ${p.level} Paladin`;
-    dom.goldValue.textContent = p.gold.toLocaleString();
-    dom.xpBarFill.style.width = `${clamp((p.xp / p.nextXp) * 100, 0, 100)}%`;
-    dom.floorBadge.textContent = `Floor ${state.floor} • Crypt`;
-    dom.seedBadge.textContent = `#${state.seed} • v0.1.0`;
+    if (force || c.hpPct !== hpPct) { dom.hpOrbFill.style.height = hpPct; c.hpPct = hpPct; }
+    if (force || c.mpPct !== mpPct) { dom.mpOrbFill.style.height = mpPct; c.mpPct = mpPct; }
+    if (force || c.hpStr !== hpStr) { dom.hpText.textContent = hpStr; c.hpStr = hpStr; }
+    if (force || c.mpStr !== mpStr) { dom.mpText.textContent = mpStr; c.mpStr = mpStr; }
+    if (force || c.lvlStr !== lvlStr) { dom.heroLevelText.textContent = lvlStr; c.lvlStr = lvlStr; }
+    if (force || c.goldStr !== goldStr) { dom.goldValue.textContent = goldStr; c.goldStr = goldStr; }
+    if (force || c.xpPct !== xpPct) { dom.xpBarFill.style.width = xpPct; c.xpPct = xpPct; }
+    if (force || c.floorStr !== floorStr) { dom.floorBadge.textContent = floorStr; c.floorStr = floorStr; }
+    if (force || c.seedStr !== seedStr) { dom.seedBadge.textContent = seedStr; c.seedStr = seedStr; }
+    if (force || c.buffStr !== buffStr) {
+      dom.buffBadge.textContent = buffStr;
+      dom.buffBadge.classList.toggle('hidden', !buffStr);
+      c.buffStr = buffStr;
+    }
 
-    dom.lootCountBadge.textContent = p.bag.length;
-    dom.potionCount.textContent = p.potions;
-    dom.newFloorBtnLabel.textContent = state.stairs.unlocked ? 'Next Floor' : 'New Map';
-    dom.btnNewFloor.classList.toggle('ready-glow', state.stairs.unlocked);
+    if (force || c.bagLen !== p.bag.length) { dom.lootCountBadge.textContent = p.bag.length; c.bagLen = p.bag.length; }
+    if (force || c.potions !== p.potions) { dom.potionCount.textContent = p.potions; c.potions = p.potions; }
+    if (force || c.elixirs !== p.manaElixirs) { dom.manaElixirCount.textContent = p.manaElixirs; c.elixirs = p.manaElixirs; }
+
+    const nfLabel = state.mode === 'TOWN' ? 'Waypoint' : (state.stairs.unlocked ? 'Next Floor' : 'New Map');
+    if (force || c.nfLabel !== nfLabel || c.unlocked !== state.stairs.unlocked) {
+      dom.newFloorBtnLabel.textContent = nfLabel;
+      dom.btnNewFloor.classList.toggle('ready-glow', state.mode === 'DUNGEON' && state.stairs.unlocked);
+      c.nfLabel = nfLabel;
+      c.unlocked = state.stairs.unlocked;
+    }
 
     // Skill & potion cooldown sweeps
+    const skillCfg = getActiveSkillConfig();
     for (const id of [1, 2, 3]) {
-      const cfg = SKILL_CONFIG[id];
+      const cfg = skillCfg[id];
       const btn = document.getElementById(cfg.elId);
       const rem = p.skillCds[id];
       const frac = rem > 0 ? clamp(rem / cfg.cd, 0, 1) : 0;
-      btn.style.setProperty('--cd', frac.toFixed(3));
-      btn.classList.toggle('is-cooldown', rem > 0);
-      btn.querySelector('.cd-text').textContent = rem > 0 ? rem.toFixed(1) : '';
+      const key = `${frac.toFixed(2)}_${rem > 0 ? rem.toFixed(1) : ''}`;
+      if (force || c['cd' + id] !== key) {
+        btn.style.setProperty('--cd', frac.toFixed(3));
+        btn.classList.toggle('is-cooldown', rem > 0);
+        btn.querySelector('.cd-text').textContent = rem > 0 ? rem.toFixed(1) : '';
+        c['cd' + id] = key;
+      }
     }
     const pFrac = p.potionCd > 0 ? clamp(p.potionCd / 1.2, 0, 1) : 0;
-    dom.btnPotion.style.setProperty('--cd', pFrac.toFixed(3));
-    dom.btnPotion.classList.toggle('is-cooldown', p.potionCd > 0);
-    dom.btnPotion.querySelector('.cd-text').textContent = p.potionCd > 0 ? p.potionCd.toFixed(1) : '';
+    const pKey = `${pFrac.toFixed(2)}_${p.potionCd > 0 ? p.potionCd.toFixed(1) : ''}`;
+    if (force || c.potCd !== pKey) {
+      dom.btnPotion.style.setProperty('--cd', pFrac.toFixed(3));
+      dom.btnPotion.classList.toggle('is-cooldown', p.potionCd > 0);
+      dom.btnPotion.querySelector('.cd-text').textContent = p.potionCd > 0 ? p.potionCd.toFixed(1) : '';
+      dom.btnManaElixir.style.setProperty('--cd', pFrac.toFixed(3));
+      dom.btnManaElixir.classList.toggle('is-cooldown', p.potionCd > 0);
+      c.potCd = pKey;
+    }
+  }
+  const updateHud = syncHudDom;
+
+  function syncClassSkillLabels() {
+    const cls = HERO_CLASSES[state.heroClass] || HERO_CLASSES.paladin;
+    dom.attackLabel.textContent = cls.basicName;
+    dom.skill1Cost.textContent = cls.skills[1].mana;
+    dom.skill2Cost.textContent = cls.skills[2].mana;
+    dom.skill3Cost.textContent = cls.skills[3].mana;
+    dom.btnSkill1.title = `${cls.skills[1].name} (1) — ${cls.skills[1].mana} MP`;
+    dom.btnSkill2.title = `${cls.skills[2].name} (2) — ${cls.skills[2].mana} MP`;
+    dom.btnSkill3.title = `${cls.skills[3].name} (3) — ${cls.skills[3].mana} MP`;
+  }
+
+  function renderMainMenuSummary() {
+    const hasSave = Boolean(localStorage.getItem(SAVE_KEY) || localStorage.getItem(LEGACY_SAVE_KEY));
+    dom.savedHeroCard.classList.toggle('hidden', !hasSave);
+    if (hasSave) {
+      const clsName = HERO_CLASSES[state.heroClass]?.name || 'Paladin';
+      dom.savedHeroName.textContent = state.heroName;
+      dom.savedHeroClass.textContent = clsName;
+      dom.savedHeroMeta.textContent = `Lv ${state.player.level} • ${state.player.gold.toLocaleString()} Gold • Best Floor ${state.highestFloor}`;
+      dom.btnContinueTown.textContent = 'CONTINUE TO TOWN';
+    } else {
+      dom.btnContinueTown.textContent = 'ENTER TOWN';
+    }
+    syncAudioToggleLabels();
+  }
+
+  function renderClassPortraits() {
+    dom.classSelectGrid.innerHTML = '';
+    for (const id of ['paladin', 'rogue', 'sorcerer']) {
+      const cls = HERO_CLASSES[id];
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'class-card' + (state.selectedCreateClass === id ? ' selected' : '');
+      card.innerHTML = `
+        <div class="class-card-top">
+          <canvas class="class-portrait" width="96" height="96"></canvas>
+          <div>
+            <div class="class-card-name">${cls.name}</div>
+            <div class="class-card-role">${cls.role}</div>
+          </div>
+        </div>
+        <div class="class-stat-chips">
+          <div class="stat-chip">STR<strong>${cls.stats.str}</strong></div>
+          <div class="stat-chip">DEX<strong>${cls.stats.dex}</strong></div>
+          <div class="stat-chip">INT<strong>${cls.stats.int}</strong></div>
+          <div class="stat-chip">VIT<strong>${cls.stats.vit}</strong></div>
+        </div>
+        <div class="class-skills-list">
+          <span>Kit:</span> ${cls.basicName} • ${cls.skills[1].name} • ${cls.skills[2].name} • ${cls.skills[3].name}
+        </div>
+      `;
+      card.addEventListener('click', () => {
+        sfx.unlock();
+        state.selectedCreateClass = id;
+        renderClassPortraits();
+      });
+      dom.classSelectGrid.appendChild(card);
+
+      // Draw live isometric portrait on the card canvas
+      const pCan = card.querySelector('canvas');
+      const pCtx = pCan.getContext('2d');
+      pCtx.fillStyle = '#07090e';
+      pCtx.fillRect(0, 0, 96, 96);
+      const grad = pCtx.createRadialGradient(48, 48, 4, 48, 48, 46);
+      grad.addColorStop(0, 'rgba(217, 119, 6, 0.25)');
+      grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      pCtx.fillStyle = grad;
+      pCtx.fillRect(0, 0, 96, 96);
+      pCtx.save();
+      pCtx.translate(48, 72);
+      pCtx.scale(1.35, 1.35);
+      pCtx.fillStyle = cls.cloak;
+      pCtx.fillRect(-8, -26, 16, 20);
+      pCtx.fillStyle = cls.armorColor;
+      pCtx.fillRect(-7, -28, 14, 15);
+      pCtx.fillStyle = cls.trimColor;
+      pCtx.fillRect(-1.5, -26, 3, 11);
+      pCtx.fillStyle = id === 'paladin' ? '#cbd5e1' : cls.cloak;
+      pCtx.fillRect(-6, -39, 12, 11);
+      pCtx.fillStyle = cls.trimColor;
+      pCtx.fillRect(-3, -34, 6, 2);
+      pCtx.restore();
+    }
+  }
+
+  function setScreen(nextScreen) {
+    state.screen = nextScreen;
+    dom.mainMenuScreen.classList.toggle('hidden', nextScreen !== 'MAIN_MENU');
+    dom.charCreateScreen.classList.toggle('hidden', nextScreen !== 'CHAR_CREATE');
+
+    const inWorld = nextScreen === 'TOWN' || nextScreen === 'DUNGEON';
+    dom.hudTopLeft.classList.toggle('hidden', !inWorld);
+    dom.hudTopRight.classList.toggle('hidden', !inWorld);
+    dom.touchControls.classList.toggle('hidden', !inWorld);
+
+    const inTown = nextScreen === 'TOWN';
+    dom.townQuickBar.classList.toggle('hidden', !inTown);
+    dom.combatCluster.classList.toggle('hidden', inTown);
+    dom.btnTownPortal.classList.toggle('hidden', inTown);
+    dom.btnLootFilter.classList.toggle('hidden', inTown);
+
+    if (nextScreen === 'MAIN_MENU') renderMainMenuSummary();
+    if (nextScreen === 'CHAR_CREATE') {
+      if (!dom.heroNameInput.value.trim()) {
+        dom.heroNameInput.value = GOTHIC_NAMES[Math.floor(Math.random() * GOTHIC_NAMES.length)];
+      }
+      renderClassPortraits();
+    }
+    if (inWorld) {
+      syncClassSkillLabels();
+      syncAudioToggleLabels();
+      dom.lootFilterLabel.textContent = LOOT_FILTER_LABELS[state.lootFilter];
+      resizeCanvas();
+      syncHudDom(true);
+    }
+  }
+
+  function createNewHero(rawName, classId) {
+    const cleanName = (rawName || '').trim().slice(0, 18) || 'Aldric';
+    const cls = HERO_CLASSES[classId] ? classId : 'paladin';
+    state.heroName = cleanName;
+    state.heroClass = cls;
+    state.floor = 1;
+    state.highestFloor = 1;
+    state.seed = Math.floor(1000 + Math.random() * 8999);
+    state.activeBuff = null;
+    const p = state.player;
+    p.level = 1;
+    p.xp = 0;
+    p.nextXp = 100;
+    p.gold = 100;
+    p.potions = 3;
+    p.manaElixirs = 2;
+    p.kills = 0;
+    p.dead = false;
+    p.equipped = createStarterGear(cls);
+    p.bag = [];
+    syncPlayerVitalsBounds();
+    p.hp = p.maxHp;
+    p.mp = p.maxMp;
+    saveHeroProfile();
+    enterTown();
+  }
+
+  function enterTown() {
+    generateTown();
+    setScreen('TOWN');
+  }
+
+  function enterDungeonFloor(seed, floor) {
+    generateDungeon(seed, floor);
+    setScreen('DUNGEON');
+    saveHeroProfile();
+  }
+
+  function refreshBlacksmithStock() {
+    const stock = [];
+    const oldFloor = state.floor;
+    state.floor = Math.max(1, state.highestFloor);
+    const rarities = ['common', 'magic', 'magic', 'rare', 'rare', 'magic'];
+    for (let i = 0; i < rarities.length; i++) {
+      const r = rarities[i];
+      const item = generateItem(r === 'common' ? 'magic' : r);
+      if (r === 'common') item.rarity = 'common';
+      const cost = (r === 'rare' ? 120 : r === 'magic' ? 65 : 35) + state.highestFloor * 18;
+      stock.push({ item, cost });
+    }
+    state.floor = oldFloor;
+    state.blacksmithStock = stock;
+  }
+
+  function temperItem(item) {
+    if (!item || !item.stats) return;
+    item.temper = (item.temper || 0) + 1;
+    if (!item.name.includes('+')) item.name = `${item.name} +1`;
+    else item.name = item.name.replace(/\+\d+$/, `+${item.temper}`);
+    for (const k of Object.keys(item.stats)) {
+      item.stats[k] = k === 'crit'
+        ? Math.round((item.stats[k] + 1.2) * 10) / 10
+        : Math.max(1, Math.round(item.stats[k] * 1.18 + 2));
+    }
+  }
+
+  function openTownNpcDrawer(npcId, subTab = 'buy') {
+    const p = state.player;
+    dom.townNpcGold.textContent = p.gold.toLocaleString();
+    dom.townNpcBody.innerHTML = '';
+
+    if (npcId === 'blacksmith') {
+      dom.townNpcTitle.textContent = 'Blacksmith Forge';
+      dom.townNpcSubtitle.textContent = 'Buy Gear • Temper Equipped • Salvage';
+      const tabs = document.createElement('div');
+      tabs.className = 'npc-tabs';
+      for (const [tid, lbl] of [['buy', 'Buy Gear'], ['temper', 'Temper'], ['salvage', 'Salvage']]) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'npc-tab-btn' + (subTab === tid ? ' active' : '');
+        b.textContent = lbl;
+        b.addEventListener('click', () => openTownNpcDrawer('blacksmith', tid));
+        tabs.appendChild(b);
+      }
+      dom.townNpcBody.appendChild(tabs);
+
+      const list = document.createElement('div');
+      list.className = 'npc-list';
+      if (subTab === 'buy') {
+        state.blacksmithStock.forEach((entry, idx) => {
+          const row = document.createElement('div');
+          row.className = 'npc-row';
+          row.innerHTML = `
+            <div class="npc-row-info">
+              <div class="npc-row-title rarity-${entry.item.rarity}">${entry.item.name}</div>
+              <div class="npc-row-sub">${SLOT_LABELS[entry.item.slot]} • ${formatStatsLine(entry.item.stats).map(([k, v, u]) => `${k} +${v}${u}`).join(', ')}</div>
+            </div>
+            <button type="button" class="npc-action-btn" ${p.gold < entry.cost || p.bag.length >= MAX_BAG_SLOTS ? 'disabled' : ''}>${entry.cost}g</button>
+          `;
+          row.querySelector('button').addEventListener('click', () => {
+            if (p.gold < entry.cost || p.bag.length >= MAX_BAG_SLOTS) return;
+            p.gold -= entry.cost;
+            p.bag.push(entry.item);
+            state.blacksmithStock.splice(idx, 1);
+            sfx.anvil();
+            saveHeroProfile();
+            syncHudDom(true);
+            openTownNpcDrawer('blacksmith', 'buy');
+          });
+          list.appendChild(row);
+        });
+      } else if (subTab === 'temper') {
+        for (const slot of SLOTS) {
+          const eq = p.equipped[slot];
+          if (!eq) continue;
+          const cost = 60 + ((eq.temper || 0) * 45) + state.highestFloor * 12;
+          const row = document.createElement('div');
+          row.className = 'npc-row';
+          row.innerHTML = `
+            <div class="npc-row-info">
+              <div class="npc-row-title rarity-${eq.rarity}">${eq.name}</div>
+              <div class="npc-row-sub">${SLOT_LABELS[slot]} • +18% Stats on Temper</div>
+            </div>
+            <button type="button" class="npc-action-btn" ${p.gold < cost ? 'disabled' : ''}>Temper ${cost}g</button>
+          `;
+          row.querySelector('button').addEventListener('click', () => {
+            if (p.gold < cost) return;
+            p.gold -= cost;
+            temperItem(eq);
+            syncPlayerVitalsBounds();
+            p.hp = p.maxHp;
+            sfx.anvil();
+            saveHeroProfile();
+            syncHudDom(true);
+            openTownNpcDrawer('blacksmith', 'temper');
+          });
+          list.appendChild(row);
+        }
+      } else {
+        if (!p.bag.length) {
+          list.innerHTML = '<div class="compare-empty">Your satchel is empty.</div>';
+        } else {
+          p.bag.forEach((it, idx) => {
+            const val = salvageGoldValue(it);
+            const row = document.createElement('div');
+            row.className = 'npc-row';
+            row.innerHTML = `
+              <div class="npc-row-info">
+                <div class="npc-row-title rarity-${it.rarity}">${it.name}</div>
+                <div class="npc-row-sub">${SLOT_LABELS[it.slot]}</div>
+              </div>
+              <button type="button" class="npc-action-btn">+${val}g</button>
+            `;
+            row.querySelector('button').addEventListener('click', () => {
+              p.gold += val;
+              p.bag.splice(idx, 1);
+              sfx.anvil();
+              saveHeroProfile();
+              syncHudDom(true);
+              openTownNpcDrawer('blacksmith', 'salvage');
+            });
+            list.appendChild(row);
+          });
+        }
+      }
+      dom.townNpcBody.appendChild(list);
+    } else if (npcId === 'stash') {
+      dom.townNpcTitle.textContent = 'Hero Stash Chest';
+      dom.townNpcSubtitle.textContent = `Shared Account Storage (${state.stash.length}/${MAX_STASH_SLOTS})`;
+      const list = document.createElement('div');
+      list.className = 'npc-list';
+      list.innerHTML = '<div class="section-heading">Stash Items (Tap to Withdraw)</div>';
+      if (!state.stash.length) {
+        list.innerHTML += '<div class="compare-empty">Stash is empty. Deposit items from your satchel below.</div>';
+      } else {
+        state.stash.forEach((it, idx) => {
+          const row = document.createElement('div');
+          row.className = 'npc-row';
+          row.innerHTML = `
+            <div class="npc-row-info">
+              <div class="npc-row-title rarity-${it.rarity}">${it.name}</div>
+              <div class="npc-row-sub">${SLOT_LABELS[it.slot]}</div>
+            </div>
+            <button type="button" class="npc-action-btn" ${p.bag.length >= MAX_BAG_SLOTS ? 'disabled' : ''}>Take</button>
+          `;
+          row.querySelector('button').addEventListener('click', () => {
+            if (p.bag.length >= MAX_BAG_SLOTS) return;
+            p.bag.push(it);
+            state.stash.splice(idx, 1);
+            sfx.loot();
+            saveStash();
+            saveHeroProfile();
+            syncHudDom(true);
+            openTownNpcDrawer('stash');
+          });
+          list.appendChild(row);
+        });
+      }
+      const bagHead = document.createElement('div');
+      bagHead.className = 'section-heading';
+      bagHead.style.marginTop = '10px';
+      bagHead.textContent = `Satchel (${p.bag.length}/${MAX_BAG_SLOTS}) — Tap to Deposit`;
+      list.appendChild(bagHead);
+      p.bag.forEach((it, idx) => {
+        const row = document.createElement('div');
+        row.className = 'npc-row';
+        row.innerHTML = `
+          <div class="npc-row-info">
+            <div class="npc-row-title rarity-${it.rarity}">${it.name}</div>
+            <div class="npc-row-sub">${SLOT_LABELS[it.slot]}</div>
+          </div>
+          <button type="button" class="npc-action-btn" ${state.stash.length >= MAX_STASH_SLOTS ? 'disabled' : ''}>Store</button>
+        `;
+        row.querySelector('button').addEventListener('click', () => {
+          if (state.stash.length >= MAX_STASH_SLOTS) return;
+          state.stash.push(it);
+          p.bag.splice(idx, 1);
+          sfx.loot();
+          saveStash();
+          saveHeroProfile();
+          syncHudDom(true);
+          openTownNpcDrawer('stash');
+        });
+        list.appendChild(row);
+      });
+      dom.townNpcBody.appendChild(list);
+    } else if (npcId === 'apothecary') {
+      dom.townNpcTitle.textContent = 'Shadowhaven Apothecary';
+      dom.townNpcSubtitle.textContent = 'Potions • Elixirs • 1-Floor Shrine Buffs';
+      const list = document.createElement('div');
+      list.className = 'npc-list';
+      const offers = [
+        { title: 'Sanctuary Full Restore', sub: 'Refill Health & Mana to 100%', cost: 0, fn: () => { p.hp = p.maxHp; p.mp = p.maxMp; sfx.holy(); } },
+        { title: 'Health Potion (+1)', sub: `Currently carried: ${p.potions}`, cost: 35, fn: () => { p.potions += 1; sfx.potion(); } },
+        { title: 'Mana Elixir (+1)', sub: `Currently carried: ${p.manaElixirs}`, cost: 40, fn: () => { p.manaElixirs += 1; sfx.potion(); } },
+        { title: 'Shrine of Precision', sub: '1-Floor Buff: +15% Crit Chance', cost: 60, fn: () => { state.activeBuff = { id: 'crit', label: '+15% Crit', crit: 15, speed: 0, gold: 0 }; sfx.holy(); } },
+        { title: 'Shrine of Alacrity', sub: '1-Floor Buff: +20% Move Speed', cost: 50, fn: () => { state.activeBuff = { id: 'speed', label: '+20% Speed', crit: 0, speed: 0.2, gold: 0 }; sfx.holy(); } },
+        { title: 'Shrine of Fortune', sub: '1-Floor Buff: +25% Gold Find', cost: 55, fn: () => { state.activeBuff = { id: 'gold', label: '+25% Gold', crit: 0, speed: 0, gold: 0.25 }; sfx.holy(); } }
+      ];
+      for (const off of offers) {
+        const row = document.createElement('div');
+        row.className = 'npc-row';
+        row.innerHTML = `
+          <div class="npc-row-info">
+            <div class="npc-row-title">${off.title}</div>
+            <div class="npc-row-sub">${off.sub}</div>
+          </div>
+          <button type="button" class="npc-action-btn" ${p.gold < off.cost ? 'disabled' : ''}>${off.cost === 0 ? 'Free' : off.cost + 'g'}</button>
+        `;
+        row.querySelector('button').addEventListener('click', () => {
+          if (p.gold < off.cost) return;
+          p.gold -= off.cost;
+          off.fn();
+          saveHeroProfile();
+          syncHudDom(true);
+          openTownNpcDrawer('apothecary');
+        });
+        list.appendChild(row);
+      }
+      dom.townNpcBody.appendChild(list);
+    } else if (npcId === 'waypoint') {
+      dom.townNpcTitle.textContent = 'Waypoint Portal';
+      dom.townNpcSubtitle.textContent = `Select Unlocked Crypt Floor (Best: ${state.highestFloor})`;
+      const grid = document.createElement('div');
+      grid.className = 'waypoint-grid';
+      for (let fl = 1; fl <= state.highestFloor; fl++) {
+        const isBoss = fl % 3 === 0;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'waypoint-floor-btn' + (isBoss ? ' boss-floor' : '');
+        btn.innerHTML = isBoss ? `Floor ${fl}<br><small>★ Guardian</small>` : `Floor ${fl}<br><small>Crypt</small>`;
+        btn.addEventListener('click', () => {
+          dom.townNpcDrawer.close();
+          sfx.portal();
+          enterDungeonFloor(Math.floor(1000 + Math.random() * 8999), fl);
+        });
+        grid.appendChild(btn);
+      }
+      dom.townNpcBody.appendChild(grid);
+    }
+
+    if (!dom.townNpcDrawer.open) dom.townNpcDrawer.showModal();
   }
 
   function toggleInventory(forceOpen) {
@@ -2819,13 +4100,15 @@
   // CANVAS RESIZE, MAIN LOOP & PWA REGISTRATION
   // =========================================================================
   function resizeCanvas() {
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const isMobile = window.matchMedia('(pointer: coarse)').matches || window.innerWidth <= 900;
+    const dpr = Math.min(window.devicePixelRatio || 1, isMobile ? 1.25 : 1.5);
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
     if (!w || !h) return;
     canvas.width = Math.round(w * dpr);
     canvas.height = Math.round(h * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    rebuildVignetteCache(w, h);
   }
 
   let lastFrame = performance.now();
@@ -2835,16 +4118,18 @@
     const dt = Math.min(0.05, Math.max(0.001, (now - lastFrame) / 1000));
     lastFrame = now;
 
-    updatePlayer(dt);
-    updateMonsters(dt);
-    updateEffectsAndLoot(dt);
-    renderIsometricWorld(now);
+    if (state.screen === 'TOWN' || state.screen === 'DUNGEON') {
+      updatePlayer(dt);
+      updateMonsters(dt);
+      updateEffectsAndLoot(dt);
+      renderIsometricWorld(now);
 
-    hudTick += dt;
-    if (hudTick >= 0.08) {
-      hudTick = 0;
-      updateHud();
-      renderMinimap();
+      hudTick += dt;
+      if (hudTick >= 0.08) {
+        hudTick = 0;
+        syncHudDom();
+        renderMinimap();
+      }
     }
 
     requestAnimationFrame(frame);
@@ -2864,7 +4149,7 @@
     setupInputs();
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
-    generateDungeon(state.seed, state.floor);
+    setScreen('MAIN_MENU');
     registerServiceWorker();
     requestAnimationFrame(frame);
   }

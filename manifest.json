@@ -1,7 +1,7 @@
 {
   "name": "Crypt of Shadows — Isometric ARPG",
   "short_name": "Crypt ARPG",
-  "description": "Mobile-first dark-gothic isometric action RPG prototype with procedural crypts, real-time melee/spell combat, and Diablo-style loot drops.",
+  "description": "Mobile-first dark-gothic isometric action RPG (v0.2.0) with 3 hero classes, Shadowhaven Town Hub, procedural crypts, elite affixes, and Diablo-style loot drops.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
