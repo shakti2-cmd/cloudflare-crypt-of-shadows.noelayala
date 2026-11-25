@@ -4,7 +4,7 @@
   // =========================================================================
   // CONSTANTS & CONFIG
   // =========================================================================
-  const VERSION = '0.3.1';
+  const VERSION = '0.4.0';
   const SAVE_SLOTS_KEY = 'crypt_arpg_v030_slots';
   const ACCOUNT_KEY = 'crypt_arpg_v030_account';
   const LEGACY_SAVE_KEY_V020 = 'crypt_arpg_v020_save';
@@ -16,7 +16,7 @@
   const TILE_W = 64;
   const TILE_H = 32;
   const WALL_H = 52;
-  const MAX_BAG_SLOTS = 24;
+  const MAX_BAG_SLOTS = 12;
   const MAX_STASH_SLOTS = 30;
   const MAX_SAVE_SLOTS = 3;
 
@@ -36,10 +36,10 @@
     legendary: { label: 'Legendary', color: '#fb923c', beam: 'rgba(251, 146, 60, 0.78)',  bg: 'rgba(54, 21, 8, 0.94)',  rank: 5 }
   };
 
-  const SLOTS = ['weapon', 'offhand', 'helm', 'armor', 'boots', 'ring', 'amulet'];
+  const SLOTS = ['weapon', 'offhand', 'helm', 'armor', 'boots', 'ring'];
   const SLOT_LABELS = {
     weapon: 'Weapon', offhand: 'Off-Hand', helm: 'Helm',
-    armor: 'Armor', boots: 'Boots', ring: 'Ring', amulet: 'Amulet'
+    armor: 'Armor', boots: 'Boots', ring: 'Ring'
   };
   const LOOT_FILTER_MODES = ['all', 'magic', 'rare'];
   const LOOT_FILTER_LABELS = { all: 'Loot: All', magic: 'Loot: Magic+', rare: 'Loot: Rare+' };
@@ -303,11 +303,19 @@
     heroNameInput: document.getElementById('heroNameInput'),
     btnRandomName: document.getElementById('btnRandomName'),
     classSelectGrid: document.getElementById('classSelectGrid'),
+    classPreviewCanvas: document.getElementById('classPreviewCanvas'),
+    classPreviewInfo: document.getElementById('classPreviewInfo'),
     petSelectGrid: document.getElementById('petSelectGrid'),
     btnCharCreateBack: document.getElementById('btnCharCreateBack'),
     btnForgeHero: document.getElementById('btnForgeHero'),
+    levelUpDraftModal: document.getElementById('levelUpDraftModal'),
+    draftPill: document.getElementById('draftPill'),
+    draftTitle: document.getElementById('draftTitle'),
+    draftSubtitle: document.getElementById('draftSubtitle'),
+    draftCardsGrid: document.getElementById('draftCardsGrid'),
     hudTopLeft: document.getElementById('hudTopLeft'),
     hudTopRight: document.getElementById('hudTopRight'),
+    streakBadge: document.getElementById('streakBadge'),
     partyPanel: document.getElementById('partyPanel'),
     touchControls: document.getElementById('touchControls'),
     combatCluster: document.getElementById('combatCluster'),
@@ -354,6 +362,9 @@
     toastBanner: document.getElementById('toastBanner'),
     btnInventory: document.getElementById('btnInventory'),
     lootCountBadge: document.getElementById('lootCountBadge'),
+    btnOpenSkills: document.getElementById('btnOpenSkills'),
+    btnAutoCombat: document.getElementById('btnAutoCombat'),
+    autoCombatLabel: document.getElementById('autoCombatLabel'),
     btnNewFloor: document.getElementById('btnNewFloor'),
     newFloorBtnLabel: document.getElementById('newFloorBtnLabel'),
     btnTownPortal: document.getElementById('btnTownPortal'),
@@ -398,11 +409,13 @@
     invCapacity: document.getElementById('invCapacity'),
     btnCloseInventory: document.getElementById('btnCloseInventory'),
     invTabGear: document.getElementById('invTabGear'),
+    invTabStats: document.getElementById('invTabStats'),
     invTabSkills: document.getElementById('invTabSkills'),
     invTabMastery: document.getElementById('invTabMastery'),
     spBadge: document.getElementById('spBadge'),
     mpBadge: document.getElementById('mpBadge'),
     invGearPanel: document.getElementById('invGearPanel'),
+    invStatsPanel: document.getElementById('invStatsPanel'),
     invSkillsPanel: document.getElementById('invSkillsPanel'),
     invMasteryPanel: document.getElementById('invMasteryPanel'),
     heroStatsStrip: document.getElementById('heroStatsStrip'),
@@ -410,9 +423,14 @@
     swapSetStrip: document.getElementById('swapSetStrip'),
     setBonusSummary: document.getElementById('setBonusSummary'),
     btnSortBag: document.getElementById('btnSortBag'),
-    invSalvageDropZone: document.getElementById('invSalvageDropZone'),
+    btnInvSalvageAll: document.getElementById('btnInvSalvageAll'),
     itemComparePanel: document.getElementById('itemComparePanel'),
-    backpackGrid: document.getElementById('backpackGrid')
+    backpackGrid: document.getElementById('backpackGrid'),
+    skillTreeModal: document.getElementById('skillTreeModal'),
+    stSpCount: document.getElementById('stSpCount'),
+    stMpCount: document.getElementById('stMpCount'),
+    btnCloseSkillTree: document.getElementById('btnCloseSkillTree'),
+    skillTreeBody: document.getElementById('skillTreeBody')
   };
 
   // =========================================================================
@@ -772,10 +790,9 @@
       weapon:  { id: 'starter_wpn', name: wNames[wType] || 'Iron Broadsword', slot: 'weapon', weaponType: wType, rarity: 'common', stats: { atk: 12, crit: 4 }, sockets: 1, gems: [] },
       offhand: null,
       helm:    { id: 'starter_helm', name: 'Wayfarer Hood', slot: 'helm', rarity: 'common', stats: { hp: 18, arm: 3 }, sockets: 0, gems: [] },
-      armor:   { id: 'starter_armor', name: 'Cryptguard Coat', slot: 'armor', rarity: 'common', stats: { hp: 28, arm: 5 }, sockets: 1, gems: [] },
+      armor:   { id: 'starter_armor', name: 'Cryptguard Coat', slot: 'armor', rarity: 'common', stats: { hp: 28, arm: 5 }, sockets: 0, gems: [] },
       boots:   { id: 'starter_boots', name: 'Ironshod Greaves', slot: 'boots', rarity: 'common', stats: { arm: 2, spd: 4 }, sockets: 0, gems: [] },
-      ring:    null,
-      amulet:  null
+      ring:    null
     };
   }
 
@@ -874,11 +891,24 @@
     minionStance: 'aggressive', // 'aggressive' | 'guard'
     lootDrops: [],
     projectiles: [],
+    enemyProjectiles: [],
+    enemyPuddles: [],
     poisonClouds: [],
     particles: [],
     floatTexts: [],
     slashArcs: [],
     novaWaves: [],
+    autoCombat: true,
+    draftOpen: false,
+    killStreak: 0,
+    streakTimer: 0,
+    moveTarget: null,
+    runPassives: { atkPct: 0, speedPct: 0, critPct: 0, atkSpeedPct: 0, magnetPct: 0, hpBonus: 0 },
+    autoWeapons: { boneBlades: 0, chainLightning: 0, emberAura: 0 },
+    awakenedSkills: { 1: false, 2: false, 3: false },
+    bladeAngle: 0,
+    chainCd: 0,
+    auraCd: 0,
     camera: { x: 0, y: 0, shake: 0 },
     player: {
       x: 5, y: 5, vx: 0, vy: 0, facingX: 1, facingY: 0,
@@ -928,16 +958,17 @@
   function getHeroStats() {
     const p = state.player;
     const cls = HERO_CLASSES[state.heroClass] || HERO_CLASSES.paladin;
-    const durScale = p.durability <= 0 ? 0.8 : 1;
     const totals = {
       atk: cls.baseAtk + (p.level - 1) * 4,
       crit: cls.baseCrit + (p.level - 1) * 0.6,
       critDmg: state.heroClass === 'archer' ? 2.05 : 1.85,
-      maxHp: cls.baseHp + (p.level - 1) * cls.hpPerLvl,
+      maxHp: cls.baseHp + (p.level - 1) * cls.hpPerLvl + (state.runPassives?.hpBonus || 0),
       maxMp: cls.baseMp + (p.level - 1) * cls.mpPerLvl,
       loh: 0,
       arm: cls.baseArm + (p.level - 1) * 1.5,
       speed: cls.speed,
+      atkSpeedMult: 1 + (state.runPassives?.atkSpeedPct || 0),
+      magnetMult: 1 + (state.runPassives?.magnetPct || 0),
       goldBonus: 1,
       minionMult: state.heroClass === 'summoner' ? 1.25 : 1.0,
       aoeMult: state.heroClass === 'sorcerer' ? 1.2 : 1.0,
@@ -945,16 +976,17 @@
       dr: 0
     };
 
-    let atkPct = 0, armPct = state.heroClass === 'paladin' ? 0.15 : 0, speedPct = 0;
+    let atkPct = (state.runPassives?.atkPct || 0), armPct = state.heroClass === 'paladin' ? 0.15 : 0, speedPct = (state.runPassives?.speedPct || 0);
+    totals.crit += (state.runPassives?.critPct || 0);
 
     for (const slot of SLOTS) {
       const item = p.equipped[slot];
       if (!item || !item.stats) continue;
-      totals.atk += Math.round((item.stats.atk || 0) * durScale);
-      totals.crit += (item.stats.crit || 0) * durScale;
-      totals.maxHp += Math.round((item.stats.hp || 0) * durScale);
-      totals.loh += Math.round((item.stats.loh || 0) * durScale);
-      totals.arm += Math.round((item.stats.arm || 0) * durScale);
+      totals.atk += Math.round(item.stats.atk || 0);
+      totals.crit += (item.stats.crit || 0);
+      totals.maxHp += Math.round(item.stats.hp || 0);
+      totals.loh += Math.round(item.stats.loh || 0);
+      totals.arm += Math.round(item.stats.arm || 0);
       if (item.stats.spd) speedPct += item.stats.spd * 0.01;
       if (Array.isArray(item.gems)) {
         for (const gId of item.gems) {
@@ -1295,12 +1327,20 @@
     state.minions = [];
     state.lootDrops = [];
     state.projectiles = [];
+    state.enemyProjectiles = [];
+    state.enemyPuddles = [];
     state.poisonClouds = [];
     state.particles = [];
     state.floatTexts = [];
     state.slashArcs = [];
     state.novaWaves = [];
     state.pendingLootTarget = null;
+    state.moveTarget = null;
+    state.killStreak = 0;
+    state.streakTimer = 0;
+    state.draftOpen = false;
+    state.streakTimer = 0;
+    state.draftOpen = false;
 
     // 1. Place non-overlapping rectangular chambers based on map size preset
     const targetRooms = randInt(rng, sizeCfg.rooms[0], sizeCfg.rooms[1]);
@@ -1533,29 +1573,36 @@
       }
     }
 
-    // 8. Spawn Dungeon Monsters (including Treasure Goblin & Boss / Floor Guardian)
+    // 8. Spawn Dungeon Monsters across 11-mob roster + Treasure Goblin & Boss / Guardian
     const riftScale = state.riftTier > 0 ? (1 + state.riftTier * 0.35) : 1;
     const floorMult = (1 + (state.floor - 1) * 0.28) * riftScale;
     const isMilestone = state.floor % 3 === 0 || state.riftTier > 0;
+    const pool = ['skeleton', 'archer', 'ghoul', 'bat', 'spider'];
+    if (state.floor >= 2) pool.push('acolyte', 'imp', 'wraith');
+    if (state.floor >= 3) pool.push('gargoyle', 'golem');
+
     for (const r of state.rooms) {
       if (r === spawnRoom) continue;
       if (r === bossRoom) {
         const boss = createMonster('boss', bossRoom.cx + 0.2, bossRoom.cy - 0.9, floorMult, isMilestone, rng);
         state.monsters.push(boss);
-        state.monsters.push(createMonster('skeleton', bossRoom.x + 1.2, bossRoom.y + 1.2, floorMult, false, rng));
-        state.monsters.push(createMonster('skeleton', bossRoom.x + bossRoom.w - 1.2, bossRoom.y + bossRoom.h - 1.2, floorMult, false, rng));
+        state.monsters.push(createMonster('archer', bossRoom.x + 1.2, bossRoom.y + 1.2, floorMult, false, rng));
+        state.monsters.push(createMonster(state.floor >= 2 ? 'acolyte' : 'skeleton', bossRoom.x + bossRoom.w - 1.2, bossRoom.y + bossRoom.h - 1.2, floorMult, false, rng));
         continue;
       }
-      const skelCount = randInt(rng, 2, 4);
-      for (let i = 0; i < skelCount; i++) {
+      const packCount = randInt(rng, 3, 5);
+      for (let i = 0; i < packCount; i++) {
         const mx = r.x + 1 + rng() * Math.max(1, r.w - 2);
         const my = r.y + 1 + rng() * Math.max(1, r.h - 2);
-        state.monsters.push(createMonster('skeleton', mx, my, floorMult, false, rng));
+        const mType = pool[Math.floor(rng() * pool.length)];
+        state.monsters.push(createMonster(mType, mx, my, floorMult, false, rng));
       }
-      if (rng() > 0.35 || r.id % 2 === 1) {
-        state.monsters.push(createMonster('ghoul', r.cx + (rng() - 0.5) * 1.4, r.cy + (rng() - 0.5) * 1.4, floorMult, false, rng));
+      if (rng() > 0.4 || r.id % 2 === 1) {
+        const elitePool = state.floor >= 3 ? ['ghoul', 'gargoyle', 'golem', 'wraith'] : ['ghoul', 'acolyte'];
+        const eType = elitePool[Math.floor(rng() * elitePool.length)];
+        state.monsters.push(createMonster(eType, r.cx + (rng() - 0.5) * 1.4, r.cy + (rng() - 0.5) * 1.4, floorMult, false, rng));
       }
-      if (r.id === 2 && rng() < 0.75) {
+      if (r.id === 2 && rng() < 0.8) {
         state.monsters.push(createMonster('goblin', r.cx, r.cy + 0.6, floorMult, false, rng));
       }
     }
@@ -1601,12 +1648,20 @@
     state.minions = [];
     state.lootDrops = [];
     state.projectiles = [];
+    state.enemyProjectiles = [];
+    state.enemyPuddles = [];
     state.poisonClouds = [];
     state.particles = [];
     state.floatTexts = [];
     state.slashArcs = [];
     state.novaWaves = [];
     state.pendingLootTarget = null;
+    state.moveTarget = null;
+    state.killStreak = 0;
+    state.streakTimer = 0;
+    state.draftOpen = false;
+    state.streakTimer = 0;
+    state.draftOpen = false;
     state.stairs = { x: 0, y: 0, unlocked: false };
 
     const minX = 11, maxX = 30, minY = 11, maxY = 30;
@@ -1665,16 +1720,24 @@
 
   function createMonster(type, x, y, floorMult, isGuardian = false, rng = Math.random) {
     const specs = {
-      skeleton: { name: 'Skeletal Warrior', maxHp: Math.round(48 * floorMult),  atk: Math.round(9 * floorMult),  speed: 2.35, range: 1.05, aggro: 7.5, cd: 1.15, xp: Math.round(28 * floorMult),  radius: 0.34, tier: 'normal' },
-      ghoul:    { name: 'Champion Ghoul',   maxHp: Math.round(105 * floorMult), atk: Math.round(15 * floorMult), speed: 2.95, range: 1.15, aggro: 8.5, cd: 0.95, xp: Math.round(68 * floorMult),  radius: 0.38, tier: 'elite' },
-      goblin:   { name: 'Treasure Goblin',  maxHp: Math.round(80 * floorMult),  atk: 0,                          speed: 4.35, range: 0.8,  aggro: 7.5, cd: 2.0,  xp: Math.round(90 * floorMult),  radius: 0.32, tier: 'goblin' },
+      skeleton: { name: 'Crypt Skeleton',   maxHp: Math.round(44 * floorMult),  atk: Math.round(8 * floorMult),  speed: 2.35, range: 1.05, aggro: 8.5, cd: 1.15, xp: Math.round(24 * floorMult),  radius: 0.34, tier: 'normal' },
+      archer:   { name: 'Skeleton Archer',  maxHp: Math.round(36 * floorMult),  atk: Math.round(9 * floorMult),  speed: 2.1,  range: 6.4,  aggro: 9.5, cd: 1.65, xp: Math.round(28 * floorMult),  radius: 0.32, tier: 'normal', ranged: true, projKind: 'arrow', projCol: '#cbd5e1' },
+      ghoul:    { name: 'Plague Ghoul',     maxHp: Math.round(92 * floorMult),  atk: Math.round(14 * floorMult), speed: 3.15, range: 1.15, aggro: 9.0, cd: 0.95, xp: Math.round(58 * floorMult),  radius: 0.38, tier: 'elite' },
+      bat:      { name: 'Blood Bat Swarm',  maxHp: Math.round(28 * floorMult),  atk: Math.round(7 * floorMult),  speed: 3.85, range: 0.95, aggro: 9.5, cd: 0.8,  xp: Math.round(20 * floorMult),  radius: 0.28, tier: 'normal' },
+      spider:   { name: 'Blight Spider',    maxHp: Math.round(48 * floorMult),  atk: Math.round(10 * floorMult), speed: 3.0,  range: 4.5,  aggro: 9.0, cd: 1.8,  xp: Math.round(30 * floorMult),  radius: 0.34, tier: 'normal', ranged: true, projKind: 'web', projCol: '#a3e635' },
+      acolyte:  { name: 'Cultist Acolyte',  maxHp: Math.round(56 * floorMult),  atk: Math.round(12 * floorMult), speed: 2.0,  range: 6.8,  aggro: 9.5, cd: 1.75, xp: Math.round(42 * floorMult),  radius: 0.34, tier: 'normal', ranged: true, projKind: 'dark', projCol: '#c084fc' },
+      imp:      { name: 'Cinder Imp',       maxHp: Math.round(42 * floorMult),  atk: Math.round(11 * floorMult), speed: 2.8,  range: 5.5,  aggro: 9.0, cd: 1.55, xp: Math.round(36 * floorMult),  radius: 0.3,  tier: 'normal', ranged: true, projKind: 'ember', projCol: '#f97316' },
+      wraith:   { name: 'Gloom Wraith',     maxHp: Math.round(72 * floorMult),  atk: Math.round(14 * floorMult), speed: 2.6,  range: 1.2,  aggro: 10,  cd: 1.0,  xp: Math.round(52 * floorMult),  radius: 0.35, tier: 'elite' },
+      gargoyle: { name: 'Obsidian Gargoyle',maxHp: Math.round(135 * floorMult), atk: Math.round(17 * floorMult), speed: 1.85, range: 1.35, aggro: 9.0, cd: 1.35, xp: Math.round(78 * floorMult),  radius: 0.42, tier: 'elite' },
+      golem:    { name: 'Flesh Golem',      maxHp: Math.round(175 * floorMult), atk: Math.round(20 * floorMult), speed: 1.55, range: 1.45, aggro: 8.5, cd: 1.6,  xp: Math.round(92 * floorMult),  radius: 0.46, tier: 'elite' },
+      goblin:   { name: 'Treasure Goblin',  maxHp: Math.round(78 * floorMult),  atk: 0,                          speed: 4.35, range: 0.8,  aggro: 7.5, cd: 2.0,  xp: Math.round(90 * floorMult),  radius: 0.32, tier: 'goblin' },
       rival:    { name: 'Shadow Rival',     maxHp: Math.round(190 * floorMult), atk: Math.round(19 * floorMult), speed: 3.4,  range: 1.25, aggro: 11,  cd: 0.85, xp: Math.round(140 * floorMult), radius: 0.4,  tier: 'elite' },
       boss:     { name: 'Horned Demon Brute',maxHp: Math.round(340 * floorMult),atk: Math.round(24 * floorMult), speed: 2.1,  range: 1.45, aggro: 9.5, cd: 1.45, xp: Math.round(240 * floorMult), radius: 0.52, tier: 'boss' }
     };
     const s = specs[type] || specs.skeleton;
     const affixKeys = Object.keys(ELITE_AFFIXES);
     const affixes = [];
-    if (type === 'ghoul' || type === 'rival') {
+    if (s.tier === 'elite') {
       affixes.push(affixKeys[Math.floor(rng() * affixKeys.length)]);
     } else if (type === 'boss') {
       const count = isGuardian ? 2 : 1;
@@ -1695,12 +1758,13 @@
 
     return {
       id: Math.random().toString(36).slice(2, 9),
-      type, name, affixes,
+      type, name, affixes, ranged: Boolean(s.ranged), projKind: s.projKind || null, projCol: s.projCol || '#ef4444',
       isGuardian: Boolean(isGuardian && type === 'boss'),
       x, y, hp: maxHp, maxHp, atk: s.atk, speed, range: s.range, aggro: s.aggro,
-      atkCdMax: cd, atkCd: 0.3, xp, radius: s.radius, tier: s.tier,
+      atkCdMax: cd, atkCd: 0.35 + rng() * 0.4, xp, radius: s.radius, tier: s.tier,
       facingX: 0, facingY: 1, walkPhase: rng() * Math.PI * 2,
       hitFlash: 0, stunTimer: 0, windupTimer: 0, slamTelegraph: 0,
+      specialCd: 2.2 + rng() * 1.5, bladeHitCd: 0,
       stagger: 0, maxStagger: type === 'boss' ? 100 : 0, staggeredTimer: 0,
       phase: 1, bossComboStep: 0, bossCastCd: 2.2,
       statuses: { burn: 0, chill: 0, chillStacks: 0, bleed: 0, poison: 0 },
@@ -1869,15 +1933,13 @@
       if (rarity !== 'magic') stats.loh = Math.round((3 + Math.random() * 4) * scale * mult);
     }
 
-    const canSocket = slot === 'weapon' || slot === 'helm' || slot === 'armor';
-    const sockets = canSocket && rarity !== 'common' ? (rarity === 'legendary' || rarity === 'set' || Math.random() < 0.35 ? 2 : 1) : 0;
     const setIds = Object.keys(SET_DEFS);
     const setId = rarity === 'set' ? setIds[nameIdx % setIds.length] : null;
 
     return {
       id: 'itm_' + Math.random().toString(36).slice(2, 10),
       name, slot, weaponType, rarity, setId, stats,
-      sockets, gems: []
+      sockets: 0, gems: []
     };
   }
 
@@ -1903,18 +1965,18 @@
 
     const goldMult = getHeroStats().goldBonus;
     if (sourceTier === 'guardian') {
+      pushDrop({ kind: 'xp_gem', amount: Math.round(45 * state.floor), label: 'Boss Soul Shard' });
       pushDrop({ kind: 'gold', amount: Math.round((95 + Math.random() * 50) * state.floor * goldMult), label: 'Guardian Chest' });
       pushDrop({ kind: 'potion', amount: 2, label: 'Crimson Vials' });
       pushDrop({ kind: 'essence', amount: 3, label: '3 Monster Essence' });
       const leg = generateItem(Math.random() < 0.35 ? 'set' : 'legendary');
       pushDrop({ kind: 'gear', item: leg, rarity: leg.rarity, label: leg.name });
-      const gem = generateGem();
-      pushDrop({ kind: 'gem', item: gem, rarity: 'rare', label: gem.name, destX: wx + 0.5, destY: wy - 0.35 });
       sfx.legendary();
       return;
     }
 
     if (sourceTier === 'boss' || sourceTier === 'goblin') {
+      pushDrop({ kind: 'xp_gem', amount: Math.round(32 * state.floor), label: 'Soul Shard' });
       pushDrop({ kind: 'gold', amount: Math.round((55 + Math.random() * 40) * state.floor * goldMult), label: sourceTier === 'goblin' ? 'Goblin Hoard' : 'Boss Hoard' });
       pushDrop({ kind: 'essence', amount: 2, label: '2 Monster Essence' });
       const rRoll = Math.random();
@@ -1922,12 +1984,11 @@
       const item = generateItem(gearRarity);
       pushDrop({ kind: 'gear', item, rarity: gearRarity, label: item.name });
       if (gearRarity === 'legendary' || gearRarity === 'set') sfx.legendary();
-      const gem = generateGem();
-      pushDrop({ kind: 'gem', item: gem, rarity: 'rare', label: gem.name, destX: wx + 0.4, destY: wy - 0.3 });
       return;
     }
 
     if (sourceTier === 'elite') {
+      pushDrop({ kind: 'xp_gem', amount: Math.round(18 * (1 + state.floor * 0.25)), label: 'Soul Shard' });
       pushDrop({ kind: 'gold', amount: Math.round((20 + Math.random() * 20) * state.floor * goldMult), label: 'Gold Coins' });
       if (Math.random() < 0.4) pushDrop({ kind: 'essence', amount: 1, label: 'Monster Essence' });
       const rarity = roll < 0.14 ? 'legendary' : roll < 0.28 ? 'set' : roll < 0.62 ? 'rare' : 'magic';
@@ -1951,16 +2012,14 @@
       return;
     }
 
-    if (roll < 0.45) {
+    pushDrop({ kind: 'xp_gem', amount: Math.round(10 * (1 + state.floor * 0.22)), label: 'Soul Shard' });
+    if (roll < 0.42) {
       const amt = Math.round((8 + Math.random() * 14) * state.floor * goldMult);
       pushDrop({ kind: 'gold', amount: amt, label: `${amt} Gold` });
-    } else if (roll < 0.57) {
+    } else if (roll < 0.52) {
       pushDrop({ kind: 'potion', amount: 1, label: 'Health Potion' });
-    } else if (roll < 0.63) {
-      const gem = generateGem();
-      pushDrop({ kind: 'gem', item: gem, rarity: 'rare', label: gem.name });
-    } else if (roll < 0.88) {
-      const rarity = roll > 0.85 ? 'legendary' : roll > 0.81 ? 'set' : roll > 0.72 ? 'rare' : 'magic';
+    } else if (roll < 0.84) {
+      const rarity = roll > 0.81 ? 'legendary' : roll > 0.77 ? 'set' : roll > 0.68 ? 'rare' : 'magic';
       const item = generateItem(rarity);
       pushDrop({ kind: 'gear', item, rarity, label: item.name });
       if (rarity === 'legendary' || rarity === 'set') sfx.legendary();
@@ -1979,6 +2038,17 @@
     const drop = state.lootDrops[dropIdx];
     if (!drop) return false;
     const p = state.player;
+
+    if (drop.kind === 'xp_gem') {
+      const mult = getStreakMultiplier();
+      const gained = Math.round(drop.amount * mult);
+      addFloatText(drop.x, drop.y, `+${gained} XP`, '#4ade80', false);
+      sfx.loot();
+      state.lootDrops.splice(dropIdx, 1);
+      grantXp(gained);
+      updateHud();
+      return true;
+    }
 
     if (drop.kind === 'gold') {
       p.gold += drop.amount;
@@ -2047,25 +2117,116 @@
     }
   }
 
+  function getStreakMultiplier() {
+    if (state.killStreak >= 20) return 2.5;
+    if (state.killStreak >= 10) return 1.8;
+    if (state.killStreak >= 5) return 1.35;
+    return 1.0;
+  }
+
   function grantXp(amount) {
     const p = state.player;
-    p.xp += amount;
+    p.xp += Math.round(amount * getStreakMultiplier());
+    let leveledUp = false;
     while (p.xp >= p.nextXp) {
       p.xp -= p.nextXp;
       p.level += 1;
-      p.nextXp = Math.round(p.nextXp * 1.42);
+      p.nextXp = Math.round(p.nextXp * 1.38);
       p.skillPoints += 1;
       if (p.level % 2 === 0) p.masteryPoints += 1;
       syncPlayerVitalsBounds();
       p.hp = p.maxHp;
       p.mp = p.maxMp;
       p.potions += 1;
+      leveledUp = true;
       sfx.lvl();
       spawnParticles(p.x, p.y, '#facc15', 22, 3.6, 20);
       addFloatText(p.x, p.y, `LEVEL ${p.level}!`, '#fde047', true);
-      showToast(`Level ${p.level}! +1 Skill Point${p.level % 2 === 0 ? ' +1 Mastery Point' : ''}`);
+    }
+    if (leveledUp && state.mode === 'DUNGEON' && !state.draftOpen) {
+      openLevelUpDraft(false);
     }
     saveProgress();
+  }
+
+  function openLevelUpDraft(isBossEvolution = false) {
+    if (!dom.levelUpDraftModal || !dom.draftCardsGrid) return;
+    const p = state.player;
+    const cls = HERO_CLASSES[state.heroClass] || HERO_CLASSES.paladin;
+    state.draftOpen = true;
+
+    const pool = [];
+    if (isBossEvolution) {
+      for (const sid of [1, 2, 3]) {
+        const sk = cls.skills[sid];
+        if (!state.awakenedSkills[sid]) {
+          pool.push({
+            tag: 'AWAKENED EVOLUTION',
+            title: `Awakened ${sk.name}`,
+            desc: `${sk.name} gains +45% power, wider AoE & bonus fury strikes!`,
+            apply: () => { state.awakenedSkills[sid] = true; p.skillRanks[sid] = Math.min(5, (p.skillRanks[sid] || 1) + 1); }
+          });
+        }
+      }
+      pool.push(
+        { tag: 'AUTO-WEAPON', title: 'Overclocked Bone Blades', desc: '+1 Bone Blade Lv & +15% Attack Speed.', apply: () => { state.autoWeapons.boneBlades = Math.min(3, (state.autoWeapons.boneBlades || 0) + 1); state.runPassives.atkSpeedPct += 0.15; } },
+        { tag: 'AUTO-WEAPON', title: 'Stormcore Awakening', desc: '+1 Chain Lightning Lv & +14% Attack Power.', apply: () => { state.autoWeapons.chainLightning = Math.min(3, (state.autoWeapons.chainLightning || 0) + 1); state.runPassives.atkPct += 0.14; } },
+        { tag: 'RELIC BLESSING', title: 'Infernal Ember Mantle', desc: '+1 Ember Aura Lv & +50 Max HP.', apply: () => { state.autoWeapons.emberAura = Math.min(3, (state.autoWeapons.emberAura || 0) + 1); state.runPassives.hpBonus += 50; } }
+      );
+    } else {
+      for (const sid of [1, 2, 3]) {
+        const sk = cls.skills[sid];
+        const rk = p.skillRanks[sid] || 1;
+        if (rk < 5) {
+          pool.push({
+            tag: 'SKILL UPGRADE',
+            title: `${sk.name} +1`,
+            desc: `Rank ${rk} → ${rk + 1}: +18% skill damage & impact.`,
+            apply: () => { p.skillRanks[sid] = rk + 1; }
+          });
+        }
+      }
+      pool.push(
+        { tag: 'AUTO-WEAPON', title: `Orbiting Bone Blades (Lv ${(state.autoWeapons.boneBlades || 0) + 1})`, desc: 'Spinning skeletal blades slice enemies around you automatically.', apply: () => { state.autoWeapons.boneBlades = Math.min(3, (state.autoWeapons.boneBlades || 0) + 1); } },
+        { tag: 'AUTO-WEAPON', title: `Chain Lightning (Lv ${(state.autoWeapons.chainLightning || 0) + 1})`, desc: 'Periodic storm arcs zap 3+ nearby foes.', apply: () => { state.autoWeapons.chainLightning = Math.min(3, (state.autoWeapons.chainLightning || 0) + 1); } },
+        { tag: 'AUTO-WEAPON', title: `Ember Aura (Lv ${(state.autoWeapons.emberAura || 0) + 1})`, desc: 'Continuous fire ring scorches & burns nearby enemies.', apply: () => { state.autoWeapons.emberAura = Math.min(3, (state.autoWeapons.emberAura || 0) + 1); } },
+        { tag: 'PASSIVE', title: 'Crimson Might', desc: '+14% Attack Damage & +6% Crit Chance.', apply: () => { state.runPassives.atkPct += 0.14; state.runPassives.critPct += 6; } },
+        { tag: 'PASSIVE', title: 'Frenzy Zeal', desc: '+14% Attack Speed & +10% Move Speed.', apply: () => { state.runPassives.atkSpeedPct += 0.14; state.runPassives.speedPct += 0.1; } },
+        { tag: 'PASSIVE', title: 'Soul Magnet & Vigor', desc: '+40% Pickup Magnet Radius & +40 Max HP.', apply: () => { state.runPassives.magnetPct += 0.4; state.runPassives.hpBonus += 40; } }
+      );
+    }
+
+    // Shuffle and pick 3 distinct options
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp;
+    }
+    const choices = pool.slice(0, 3);
+
+    if (dom.draftPill) dom.draftPill.textContent = isBossEvolution ? 'BOSS CHEST EVOLUTION' : `LEVEL ${p.level} REACHED`;
+    if (dom.draftTitle) dom.draftTitle.textContent = isBossEvolution ? 'Awaken a Super-Skill' : 'Choose Your Upgrade';
+    if (dom.draftSubtitle) dom.draftSubtitle.textContent = isBossEvolution ? 'Boss Slayer Relic — Select 1 Awakened Blessing' : 'Tap 1 card to power up & resume combat';
+
+    dom.draftCardsGrid.innerHTML = '';
+    for (const card of choices) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'draft-option-card' + (isBossEvolution ? ' evolved' : '');
+      btn.innerHTML = `<span class="draft-card-tag">${card.tag}</span><span class="draft-card-title">${card.title}</span><span class="draft-card-desc">${card.desc}</span>`;
+      btn.addEventListener('click', () => {
+        card.apply();
+        syncPlayerVitalsBounds();
+        p.hp = Math.min(p.maxHp, p.hp + Math.round(p.maxHp * 0.25));
+        sfx.lvl();
+        state.draftOpen = false;
+        if (dom.levelUpDraftModal.open) dom.levelUpDraftModal.close();
+        updateHud(true);
+        saveHeroProfile();
+        showToast(`Unlocked: ${card.title}!`);
+      });
+      dom.draftCardsGrid.appendChild(btn);
+    }
+    if (!dom.levelUpDraftModal.open) dom.levelUpDraftModal.showModal();
   }
 
   function advanceBounty(type, amt = 1) {
@@ -2183,12 +2344,22 @@
     if (idx !== -1) state.monsters.splice(idx, 1);
 
     state.player.kills += 1;
+    state.killStreak += 1;
+    state.streakTimer = 4.2;
     state.account.bestiary[m.name] = (state.account.bestiary[m.name] || 0) + 1;
     advanceBounty('kills', 1);
     if (m.tier === 'elite') advanceBounty('elites', 1);
     if (m.tier === 'boss') advanceBounty('bosses', 1);
 
     spawnParticles(m.x, m.y, m.type === 'ghoul' ? '#60a5fa' : '#94a3b8', 16, 3.0);
+
+    if (m.type === 'ghoul') {
+      state.enemyPuddles.push({ x: m.x, y: m.y, r: 1.35, life: 4.5, tick: 0.45, dmg: Math.max(4, Math.round(m.atk * 0.42)) });
+    } else if (m.type === 'imp') {
+      sfx.fire();
+      state.novaWaves.push({ x: m.x, y: m.y, r: 0.2, maxR: 1.8, color: '#f97316', life: 0.25, maxLife: 0.25 });
+      if (dist(m.x, m.y, state.player.x, state.player.y) <= 1.8) damagePlayer(Math.round(m.atk * 1.1));
+    }
 
     if (m.affixes && m.affixes.includes('molten')) {
       sfx.fire();
@@ -2227,6 +2398,7 @@
       state.camera.shake = 9;
       saveHeroProfile();
       updateHud();
+      if (!state.draftOpen && !state.player.dead) openLevelUpDraft(true);
     }
   }
 
@@ -2269,7 +2441,9 @@
     const p = state.player;
     if (p.dead || p.attackCd > 0 || state.mode === 'TOWN') return;
     const cls = state.heroClass;
-    p.attackCd = cls === 'rogue' ? 0.25 : cls === 'archer' ? 0.30 : cls === 'sorcerer' ? 0.36 : 0.34;
+    const stats = getHeroStats();
+    const baseCd = cls === 'rogue' ? 0.25 : cls === 'archer' ? 0.30 : cls === 'sorcerer' ? 0.36 : 0.34;
+    p.attackCd = baseCd / Math.max(0.5, stats.atkSpeedMult);
     p.attackAnim = 0.22;
 
     if (input.aimX !== null && input.aimY !== null) {
@@ -2278,8 +2452,6 @@
     } else {
       autoFaceTarget(cls === 'sorcerer' || cls === 'archer' || cls === 'summoner' ? 9.5 : 3.4);
     }
-
-    const stats = getHeroStats();
 
     // Attack Ritual Crystals & Secret Walls & Oil Barrels in melee/projectile path
     for (let c = state.crystals.length - 1; c >= 0; c--) {
@@ -2350,7 +2522,8 @@
     p.skillCds[slotId] = cfg.cd;
     p.castAnim = 0.28;
     const stats = getHeroStats();
-    const rankMult = 1 + ((p.skillRanks[slotId] || 1) - 1) * 0.18;
+    const awakeBoost = state.awakenedSkills[slotId] ? 1.45 : 1.0;
+    const rankMult = (1 + ((p.skillRanks[slotId] || 1) - 1) * 0.18) * awakeBoost;
     const cls = state.heroClass;
     const stag = cfg.stagger || 14;
 
@@ -2834,7 +3007,11 @@
         toggleInventory();
         return;
       }
-      if (dom.inventoryDrawer.open || dom.townNpcDrawer.open || state.player.dead) return;
+      if (k === 'k') {
+        openSkillTreeModal();
+        return;
+      }
+      if (dom.inventoryDrawer.open || dom.townNpcDrawer.open || dom.skillTreeModal?.open || state.draftOpen || state.player.dead) return;
 
       input.keys.add(k);
       if (k === ' ') performBasicAttack();
@@ -2955,15 +3132,21 @@
         }
       }
 
-      // Aim toward click & attack
+      // Desktop & Mobile Click/Tap-to-Move when Auto-Combat is ON, or manual aim-fire when OFF
       const dx = wp.x - state.player.x;
       const dy = wp.y - state.player.y;
       const len = Math.hypot(dx, dy) || 1;
-      input.aimX = dx / len;
-      input.aimY = dy / len;
-      performBasicAttack();
-      input.aimX = null;
-      input.aimY = null;
+      if (state.autoCombat) {
+        state.moveTarget = { x: wp.x, y: wp.y };
+        state.player.facingX = dx / len;
+        state.player.facingY = dy / len;
+      } else {
+        input.aimX = dx / len;
+        input.aimY = dy / len;
+        performBasicAttack();
+        input.aimX = null;
+        input.aimY = null;
+      }
     });
 
     // Main Menu & Character Creation
@@ -3036,15 +3219,28 @@
       if (e.target === dom.townNpcDrawer) dom.townNpcDrawer.close();
     });
 
-    // Inventory Tabs & Sort Bag
+    // Inventory Tabs, Skill Tree Modal & Auto-Combat Toggle
     on(dom.btnInventory, 'click', () => { sfx.unlock(); toggleInventory(); });
     on(dom.btnCloseInventory, 'click', () => toggleInventory(false));
     on(dom.inventoryDrawer, 'click', (e) => {
       if (e.target === dom.inventoryDrawer) toggleInventory(false);
     });
     on(dom.invTabGear, 'click', () => { state.invTab = 'gear'; renderInventoryUI(); });
+    on(dom.invTabStats, 'click', () => { state.invTab = 'stats'; renderInventoryUI(); });
     on(dom.invTabSkills, 'click', () => { state.invTab = 'skills'; renderInventoryUI(); });
     on(dom.invTabMastery, 'click', () => { state.invTab = 'mastery'; renderInventoryUI(); });
+    on(dom.btnInvSalvageAll, 'click', salvageAllBagGear);
+    on(dom.btnOpenSkills, 'click', () => { sfx.unlock(); openSkillTreeModal(true); });
+    on(dom.btnCloseSkillTree, 'click', () => openSkillTreeModal(false));
+    on(dom.skillTreeModal, 'click', (e) => {
+      if (e.target === dom.skillTreeModal) openSkillTreeModal(false);
+    });
+    on(dom.btnAutoCombat, 'click', () => {
+      sfx.unlock();
+      state.autoCombat = !state.autoCombat;
+      syncHudDom(true);
+      showToast(state.autoCombat ? 'Auto-Combat: ON' : 'Auto-Combat: OFF (Manual)');
+    });
     on(dom.btnSortBag, 'click', () => {
       state.player.bag.sort((a, b) => ((RARITY[b.rarity]?.rank || 0) - (RARITY[a.rarity]?.rank || 0)) || String(a.slot).localeCompare(String(b.slot)));
       sfx.loot();
@@ -3163,6 +3359,7 @@
 
     if (Math.hypot(sx, sy) > 0.08) {
       state.pendingLootTarget = null;
+      state.moveTarget = null;
     } else if (state.pendingLootTarget) {
       const idx = state.lootDrops.indexOf(state.pendingLootTarget);
       if (idx === -1) state.pendingLootTarget = null;
@@ -3175,6 +3372,15 @@
           sx = isoDir.x / il;
           sy = isoDir.y / il;
         }
+      }
+    } else if (state.moveTarget) {
+      const d = dist(p.x, p.y, state.moveTarget.x, state.moveTarget.y);
+      if (d <= 0.3) state.moveTarget = null;
+      else {
+        const isoDir = worldToIso(state.moveTarget.x - p.x, state.moveTarget.y - p.y);
+        const il = Math.hypot(isoDir.x, isoDir.y) || 1;
+        sx = isoDir.x / il;
+        sy = isoDir.y / il;
       }
     }
 
@@ -3203,6 +3409,95 @@
     }
 
     if (state.mode === 'TOWN') return;
+
+    // Kill Streak Timer
+    if (state.killStreak > 0) {
+      state.streakTimer -= dt;
+      if (state.streakTimer <= 0) {
+        state.killStreak = 0;
+        state.streakTimer = 0;
+      }
+    }
+
+    // Bullet-Heaven Smart Auto-Attack & Auto-Cast
+    const stats = getHeroStats();
+    if (state.autoCombat && state.monsters.length > 0) {
+      const cls = state.heroClass;
+      const atkRange = (cls === 'paladin' || cls === 'rogue') ? 2.45 : 9.2;
+      const nearest = findNearestEnemy(9.5);
+      if (nearest) {
+        const nd = dist(p.x, p.y, nearest.x, nearest.y);
+        if (nd <= atkRange && p.attackCd <= 0) {
+          performBasicAttack();
+        }
+        if (nd <= 6.8) {
+          const skCfg = getActiveSkillConfig();
+          for (const sid of [1, 2, 3]) {
+            if (p.skillCds[sid] <= 0 && p.mp >= skCfg[sid].mana) {
+              castSkill(sid);
+              break;
+            }
+          }
+          if (p.skillCds[4] <= 0 && (nd <= 4.5 || nearest.tier === 'boss')) {
+            const wSpec = getEquippedWeaponSpec();
+            if (p.mp >= wSpec.mana) castWeaponSkill();
+          }
+          if (p.ultCharge >= 100 && (nearest.tier === 'boss' || state.monsters.filter((m) => dist(p.x, p.y, m.x, m.y) <= 5.5).length >= 3)) {
+            castUltimate();
+          }
+        }
+      }
+    }
+
+    // Passive Auto-Weapons (Bone Blades, Chain Lightning, Ember Aura)
+    if (state.autoWeapons.boneBlades > 0) {
+      const lv = state.autoWeapons.boneBlades;
+      state.bladeAngle += dt * 4.2;
+      const count = 2 + lv;
+      for (let b = 0; b < count; b++) {
+        const ang = state.bladeAngle + (Math.PI * 2 * b) / count;
+        const bx = p.x + Math.cos(ang) * 2.05;
+        const by = p.y + Math.sin(ang) * 2.05;
+        for (let mi = state.monsters.length - 1; mi >= 0; mi--) {
+          const m = state.monsters[mi];
+          if ((m.bladeHitCd || 0) <= 0 && dist(bx, by, m.x, m.y) <= m.radius + 0.55) {
+            m.bladeHitCd = 0.45;
+            damageMonster(m, stats.atk * (0.65 + lv * 0.25), Math.cos(ang), Math.sin(ang), true, 4);
+          }
+        }
+      }
+    }
+    if (state.autoWeapons.chainLightning > 0) {
+      const lv = state.autoWeapons.chainLightning;
+      state.chainCd -= dt;
+      if (state.chainCd <= 0 && state.monsters.length > 0) {
+        const nearby = state.monsters.filter((m) => dist(p.x, p.y, m.x, m.y) <= 7.5).slice(0, 2 + lv);
+        if (nearby.length > 0) {
+          state.chainCd = Math.max(1.2, 2.5 - lv * 0.35);
+          sfx.arcane();
+          for (const m of nearby) {
+            spawnParticles(m.x, m.y, '#38bdf8', 6, 2.2, 18);
+            damageMonster(m, stats.atk * (0.8 + lv * 0.3), 0, 0, true, 6);
+          }
+        }
+      }
+    }
+    if (state.autoWeapons.emberAura > 0) {
+      const lv = state.autoWeapons.emberAura;
+      state.auraCd -= dt;
+      if (state.auraCd <= 0) {
+        state.auraCd = 0.72;
+        const auraR = 2.4 + lv * 0.45;
+        state.novaWaves.push({ x: p.x, y: p.y, r: 0.5, maxR: auraR, color: '#fb923c', life: 0.28, maxLife: 0.28 });
+        for (let mi = state.monsters.length - 1; mi >= 0; mi--) {
+          const m = state.monsters[mi];
+          if (dist(p.x, p.y, m.x, m.y) <= auraR + m.radius) {
+            applyStatus(m, 'burn', 2.5);
+            damageMonster(m, stats.atk * (0.42 + lv * 0.2), 0, 0, false, 2);
+          }
+        }
+      }
+    }
 
     // Cursed Fog Torch Fuel & Wall Brazier relight
     if (state.floorCondition === 'cursed_fog') {
@@ -3481,8 +3776,51 @@
       }
 
       const moveMult = m.statuses && m.statuses.chill > 0 ? 0.65 : 1.0;
+      m.bladeHitCd = Math.max(0, (m.bladeHitCd || 0) - dt);
+      m.specialCd = Math.max(0, (m.specialCd || 0) - dt);
+
+      // Special AI: Wraith Phase-Blink & Gargoyle/Golem Slam Telegraph
+      if (m.type === 'wraith' && m.specialCd <= 0 && d > 2.4 && d < 8.5) {
+        m.specialCd = 4.2;
+        const bx = clamp(p.x - nx * 1.35, 1.5, MAP_W - 2.5);
+        const by = clamp(p.y - ny * 1.35, 1.5, MAP_H - 2.5);
+        if (isPositionClear(bx, by, m.radius)) {
+          spawnParticles(m.x, m.y, '#818cf8', 8, 2.2);
+          m.x = bx; m.y = by;
+          spawnParticles(m.x, m.y, '#818cf8', 8, 2.2);
+        }
+      } else if ((m.type === 'gargoyle' || m.type === 'golem') && m.specialCd <= 0 && d <= 2.9) {
+        m.specialCd = 4.4;
+        state.bossTelegraphs.push({ kind: 'pool', x: m.x, y: m.y, r: m.type === 'golem' ? 2.1 : 1.7, angle: 0, elapsed: 0, dur: 0.95, dmg: Math.round(m.atk * 1.45), owner: m });
+      }
+
+      if (m.ranged) {
+        if (d > m.range) {
+          moveWithSlide(m, nx * m.speed * moveMult * dt, ny * m.speed * moveMult * dt, m.radius);
+          m.walkPhase += dt * 8;
+        } else if (d < Math.max(2.2, m.range * 0.42)) {
+          moveWithSlide(m, -nx * m.speed * 0.7 * moveMult * dt, -ny * m.speed * 0.7 * moveMult * dt, m.radius);
+          m.walkPhase += dt * 6;
+        }
+        if (d <= m.range + 0.6 && m.atkCd <= 0) {
+          m.atkCd = m.atkCdMax;
+          const pSpd = m.projKind === 'arrow' ? 7.6 : m.projKind === 'web' ? 5.8 : 6.4;
+          state.enemyProjectiles.push({
+            kind: m.projKind, color: m.projCol,
+            x: m.x + nx * 0.35, y: m.y + ny * 0.35,
+            vx: nx * pSpd, vy: ny * pSpd,
+            dmg: m.atk, life: 1.5, owner: m
+          });
+        }
+        continue;
+      }
+
       if (d > m.range) {
         let sepX = 0, sepY = 0;
+        if (m.type === 'bat') {
+          const perp = Math.sin(m.walkPhase * 1.7) * 1.8;
+          sepX += -ny * perp; sepY += nx * perp;
+        }
         for (let j = 0; j < state.monsters.length; j++) {
           if (i === j) continue;
           const o = state.monsters[j];
@@ -3494,11 +3832,42 @@
           }
         }
         moveWithSlide(m, (nx * m.speed * moveMult + sepX) * dt, (ny * m.speed * moveMult + sepY) * dt, m.radius);
-        m.walkPhase += dt * 8;
+        m.walkPhase += dt * (m.type === 'bat' ? 14 : 8);
       } else if (m.atkCd <= 0) {
         m.atkCd = m.atkCdMax;
         damagePlayer(m.atk, m);
       }
+    }
+
+    // Update Enemy Projectiles
+    for (let i = state.enemyProjectiles.length - 1; i >= 0; i--) {
+      const ep = state.enemyProjectiles[i];
+      ep.life -= dt;
+      ep.x += ep.vx * dt;
+      ep.y += ep.vy * dt;
+      if (ep.life <= 0 || !isPositionClear(ep.x, ep.y, 0.14)) {
+        state.enemyProjectiles.splice(i, 1);
+        continue;
+      }
+      if (!p.dead && dist(ep.x, ep.y, p.x, p.y) <= 0.45) {
+        if (ep.kind === 'web') p.chillTimer = Math.max(p.chillTimer, 1.8);
+        damagePlayer(ep.dmg, ep.owner || null);
+        state.enemyProjectiles.splice(i, 1);
+      }
+    }
+
+    // Update Toxic/Cinder Enemy Puddles
+    for (let i = state.enemyPuddles.length - 1; i >= 0; i--) {
+      const pd = state.enemyPuddles[i];
+      pd.life -= dt;
+      pd.tick -= dt;
+      if (pd.tick <= 0) {
+        pd.tick = 0.65;
+        if (!p.dead && dist(pd.x, pd.y, p.x, p.y) <= pd.r) {
+          damagePlayer(pd.dmg, null);
+        }
+      }
+      if (pd.life <= 0) state.enemyPuddles.splice(i, 1);
     }
 
     if (activeBoss) {
@@ -3538,9 +3907,8 @@
 
     if (p.hp <= 0) {
       p.dead = true;
-      p.durability = Math.max(0, p.durability - 15);
       const clsName = HERO_CLASSES[state.heroClass]?.name || 'Hero';
-      dom.deathSummary.textContent = `${state.heroName} slain on Floor ${state.floor} • Lv ${p.level} ${clsName} (-15% Durability).`;
+      dom.deathSummary.textContent = `${state.heroName} slain on Floor ${state.floor} • Lv ${p.level} ${clsName}.`;
       dom.deathOverlay.classList.remove('hidden');
       saveHeroProfile();
     }
@@ -3637,16 +4005,17 @@
         d.z += d.vz * dt;
         d.vz -= 290 * dt;
         if (d.z <= 0) { d.z = 0; d.vz = 0; d.x = d.destX; d.y = d.destY; }
-      } else if (d.kind === 'gold' && !p.dead) {
+      } else if ((d.kind === 'gold' || d.kind === 'xp_gem') && !p.dead) {
         const dx = p.x - d.x, dy = p.y - d.y;
         const pxDist = Math.hypot((dx - dy) * (TILE_W * 0.5), (dx + dy) * (TILE_H * 0.5));
-        if (pxDist <= 90) {
+        const magR = (d.kind === 'xp_gem' ? 155 : 95) * getHeroStats().magnetMult;
+        if (pxDist <= magR) {
           const wDist = Math.hypot(dx, dy) || 1;
-          const pull = Math.min(wDist, 9.5 * dt);
+          const pull = Math.min(wDist, 10.5 * dt);
           d.x += (dx / wDist) * pull;
           d.y += (dy / wDist) * pull;
           d.destX = d.x; d.destY = d.y;
-          if (wDist <= 0.65) collectLootDrop(i);
+          if (wDist <= 0.7) collectLootDrop(i);
         }
       }
     }
@@ -4052,7 +4421,36 @@
       }
     }
 
-    // Pass 3: Slash Arcs, Projectiles & Particles
+    // Pass 3: Auto-Weapons, Slash Arcs, Projectiles & Particles
+    if (state.mode === 'DUNGEON' && !state.player.dead) {
+      if (state.autoWeapons.emberAura > 0) {
+        const pIso = worldToIso(state.player.x, state.player.y);
+        const auraR = (2.4 + state.autoWeapons.emberAura * 0.45);
+        ctx.save();
+        ctx.strokeStyle = 'rgba(251, 146, 60, 0.35)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.ellipse(pIso.x + offX, pIso.y + offY, auraR * TILE_W * 0.48, auraR * TILE_H * 0.48, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+      if (state.autoWeapons.boneBlades > 0) {
+        const count = 2 + state.autoWeapons.boneBlades;
+        for (let b = 0; b < count; b++) {
+          const ang = state.bladeAngle + (Math.PI * 2 * b) / count;
+          const bIso = worldToIso(state.player.x + Math.cos(ang) * 2.05, state.player.y + Math.sin(ang) * 2.05);
+          ctx.save();
+          ctx.translate(bIso.x + offX, bIso.y + offY - 16);
+          ctx.rotate(ang + now * 0.01);
+          ctx.fillStyle = '#e2e8f0';
+          ctx.fillRect(-2, -10, 4, 20);
+          ctx.fillStyle = '#38bdf8';
+          ctx.fillRect(-1, -8, 2, 16);
+          ctx.restore();
+        }
+      }
+    }
+
     for (let i = 0; i < state.slashArcs.length; i++) {
       const s = state.slashArcs[i];
       const iso = worldToIso(s.x, s.y);
@@ -4078,6 +4476,17 @@
       ctx.restore();
     }
 
+    for (let i = 0; i < state.enemyPuddles.length; i++) {
+      const pd = state.enemyPuddles[i];
+      const iso = worldToIso(pd.x, pd.y);
+      ctx.fillStyle = 'rgba(34, 197, 94, 0.34)';
+      ctx.strokeStyle = 'rgba(163, 230, 53, 0.65)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.ellipse(iso.x + offX, iso.y + offY, pd.r * TILE_W * 0.45, pd.r * TILE_H * 0.45, 0, 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
+    }
+
     for (let i = 0; i < state.projectiles.length; i++) {
       const pr = state.projectiles[i];
       const iso = worldToIso(pr.x, pr.y);
@@ -4090,6 +4499,21 @@
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
       ctx.arc(sx, sy, pr.kind === 'bolt' ? 2.2 : 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    for (let i = 0; i < state.enemyProjectiles.length; i++) {
+      const ep = state.enemyProjectiles[i];
+      const iso = worldToIso(ep.x, ep.y);
+      const sx = iso.x + offX;
+      const sy = iso.y + offY - 16;
+      ctx.fillStyle = ep.color || '#ef4444';
+      ctx.beginPath();
+      ctx.arc(sx, sy, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#fef2f2';
+      ctx.beginPath();
+      ctx.arc(sx, sy, 2, 0, Math.PI * 2);
       ctx.fill();
     }
 
@@ -4393,7 +4817,6 @@
       ctx.beginPath();
       ctx.arc(sx, sy - 50, 11, 0, Math.PI * 2);
       ctx.fill();
-      // Curved Horns
       ctx.strokeStyle = '#e2e8f0';
       ctx.lineWidth = 3;
       ctx.beginPath();
@@ -4402,56 +4825,111 @@
       ctx.moveTo(sx + 7, sy - 56);
       ctx.quadraticCurveTo(sx + 17, sy - 68, sx + 12, sy - 74);
       ctx.stroke();
-      // Glowing ember eyes
       ctx.fillStyle = '#fde047';
       ctx.fillRect(sx - 5, sy - 51, 3, 3);
       ctx.fillRect(sx + 2, sy - 51, 3, 3);
-      // Legs
       ctx.fillStyle = '#450a0a';
       ctx.fillRect(sx - 11, sy - 13 + stride * 0.4, 8, 13);
       ctx.fillRect(sx + 3, sy - 13 - stride * 0.4, 8, 13);
+    } else if (m.type === 'golem') {
+      // Flesh Golem (massive hulking silhouette)
+      ctx.fillStyle = flash ? '#ffffff' : '#7f1d1d';
+      ctx.beginPath(); ctx.roundRect(sx - 13, sy - 36, 26, 25, 6); ctx.fill();
+      ctx.fillStyle = flash ? '#ffffff' : '#b91c1c';
+      ctx.beginPath(); ctx.arc(sx, sy - 40, 8, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fca5a5'; ctx.fillRect(sx - 4, sy - 41, 2.5, 2.5); ctx.fillRect(sx + 1.5, sy - 41, 2.5, 2.5);
+      ctx.fillStyle = '#450a0a'; ctx.fillRect(sx - 9, sy - 11 + stride * 0.35, 6, 11); ctx.fillRect(sx + 3, sy - 11 - stride * 0.35, 6, 11);
+    } else if (m.type === 'gargoyle') {
+      // Obsidian Gargoyle (stone wings & horns)
+      ctx.fillStyle = flash ? '#ffffff' : '#334155';
+      ctx.beginPath(); ctx.moveTo(sx - 16, sy - 34); ctx.lineTo(sx, sy - 24); ctx.lineTo(sx + 16, sy - 34); ctx.lineTo(sx + 8, sy - 14); ctx.lineTo(sx - 8, sy - 14); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = flash ? '#ffffff' : '#475569';
+      ctx.beginPath(); ctx.roundRect(sx - 8, sy - 30, 16, 20, 4); ctx.fill();
+      ctx.fillStyle = '#38bdf8'; ctx.fillRect(sx - 3, sy - 34, 2, 2); ctx.fillRect(sx + 1, sy - 34, 2, 2);
+    } else if (m.type === 'wraith') {
+      // Gloom Wraith (floating spectral cloak)
+      const hover = Math.sin(now * 0.008 + m.walkPhase) * 3;
+      ctx.fillStyle = flash ? '#ffffff' : 'rgba(99, 102, 241, 0.85)';
+      ctx.beginPath(); ctx.moveTo(sx, sy - 38 + hover); ctx.lineTo(sx + 10, sy - 10 + hover); ctx.lineTo(sx, sy - 14 + hover); ctx.lineTo(sx - 10, sy - 10 + hover); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#e0e7ff'; ctx.fillRect(sx - 3, sy - 29 + hover, 2, 2); ctx.fillRect(sx + 1, sy - 29 + hover, 2, 2);
+    } else if (m.type === 'imp') {
+      // Cinder Imp (small horned fire demon)
+      ctx.fillStyle = flash ? '#ffffff' : '#ea580c';
+      ctx.beginPath(); ctx.roundRect(sx - 6, sy - 20, 12, 13, 4); ctx.fill();
+      ctx.fillStyle = flash ? '#ffffff' : '#f97316';
+      ctx.beginPath(); ctx.arc(sx, sy - 24, 5.5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fef08a'; ctx.fillRect(sx - 2.5, sy - 25, 2, 2); ctx.fillRect(sx + 1, sy - 25, 2, 2);
+      ctx.fillStyle = '#7c2d12'; ctx.fillRect(sx - 4, sy - 8 + stride * 0.4, 3, 8); ctx.fillRect(sx + 1, sy - 8 - stride * 0.4, 3, 8);
+    } else if (m.type === 'acolyte') {
+      // Cultist Acolyte (purple hooded warlock)
+      ctx.fillStyle = flash ? '#ffffff' : '#581c87';
+      ctx.beginPath(); ctx.moveTo(sx - 8, sy - 6); ctx.lineTo(sx - 6, sy - 28); ctx.lineTo(sx + 6, sy - 28); ctx.lineTo(sx + 8, sy - 6); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = flash ? '#ffffff' : '#7e22ce';
+      ctx.beginPath(); ctx.arc(sx, sy - 31, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#e879f9'; ctx.fillRect(sx - 2.5, sy - 31, 2, 2); ctx.fillRect(sx + 0.5, sy - 31, 2, 2);
+    } else if (m.type === 'spider') {
+      // Blight Spider (8 legs + green venom sacs)
+      ctx.strokeStyle = '#365314'; ctx.lineWidth = 1.8;
+      for (let leg = -1; leg <= 1; leg += 2) {
+        for (let k = -1; k <= 1; k++) {
+          ctx.beginPath(); ctx.moveTo(sx, sy - 9); ctx.lineTo(sx + leg * 12, sy - 13 + k * 4 + stride * 0.3 * k); ctx.stroke();
+        }
+      }
+      ctx.fillStyle = flash ? '#ffffff' : '#4d7c0f';
+      ctx.beginPath(); ctx.ellipse(sx, sy - 10, 8, 6, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#bef264'; ctx.fillRect(sx - 3, sy - 10, 2, 2); ctx.fillRect(sx + 1, sy - 10, 2, 2);
+    } else if (m.type === 'bat') {
+      // Blood Bat Swarm (flapping wings)
+      const flap = Math.sin(now * 0.02 + m.walkPhase) * 6;
+      ctx.fillStyle = flash ? '#ffffff' : '#9f1239';
+      ctx.beginPath(); ctx.moveTo(sx, sy - 22); ctx.lineTo(sx - 13, sy - 26 + flap); ctx.lineTo(sx - 6, sy - 16); ctx.lineTo(sx + 6, sy - 16); ctx.lineTo(sx + 13, sy - 26 + flap); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#fda4af'; ctx.fillRect(sx - 2, sy - 21, 1.5, 1.5); ctx.fillRect(sx + 1, sy - 21, 1.5, 1.5);
+    } else if (m.type === 'archer') {
+      // Skeleton Archer (hood + bow)
+      ctx.fillStyle = flash ? '#ffffff' : '#94a3b8';
+      ctx.fillRect(sx - 5, sy - 24, 10, 13);
+      ctx.fillStyle = flash ? '#ffffff' : '#e2e8f0';
+      ctx.beginPath(); ctx.arc(sx, sy - 30, 5.5, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#d97706'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(sx + 6, sy - 19, 8, -1.1, 1.1); ctx.stroke();
+      ctx.fillStyle = '#4ade80'; ctx.fillRect(sx - 2.5, sy - 31, 2, 2); ctx.fillRect(sx + 1, sy - 31, 2, 2);
+      ctx.fillStyle = '#cbd5e1'; ctx.fillRect(sx - 4, sy - 11 + stride * 0.4, 3, 11); ctx.fillRect(sx + 1, sy - 11 - stride * 0.4, 3, 11);
     } else if (isGhoul) {
-      // Champion Ghoul
+      // Plague Ghoul
       ctx.fillStyle = flash ? '#ffffff' : '#1e3a8a';
-      ctx.beginPath();
-      ctx.roundRect(sx - 9, sy - 28, 18, 19, 5);
-      ctx.fill();
+      ctx.beginPath(); ctx.roundRect(sx - 9, sy - 28, 18, 19, 5); ctx.fill();
       ctx.fillStyle = flash ? '#ffffff' : '#60a5fa';
-      ctx.beginPath();
-      ctx.arc(sx, sy - 33, 7, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#e0f2fe';
-      ctx.fillRect(sx - 3.5, sy - 34, 2, 2);
-      ctx.fillRect(sx + 1.5, sy - 34, 2, 2);
-      ctx.fillStyle = '#172554';
-      ctx.fillRect(sx - 6, sy - 10 + stride * 0.4, 4.5, 10);
-      ctx.fillRect(sx + 1.5, sy - 10 - stride * 0.4, 4.5, 10);
+      ctx.beginPath(); ctx.arc(sx, sy - 33, 7, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#e0f2fe'; ctx.fillRect(sx - 3.5, sy - 34, 2, 2); ctx.fillRect(sx + 1.5, sy - 34, 2, 2);
+      ctx.fillStyle = '#172554'; ctx.fillRect(sx - 6, sy - 10 + stride * 0.4, 4.5, 10); ctx.fillRect(sx + 1.5, sy - 10 - stride * 0.4, 4.5, 10);
+    } else if (m.type === 'goblin') {
+      // Treasure Goblin (gold sack!)
+      ctx.fillStyle = flash ? '#ffffff' : '#15803d';
+      ctx.beginPath(); ctx.roundRect(sx - 7, sy - 22, 14, 14, 5); ctx.fill();
+      ctx.fillStyle = '#facc15'; ctx.beginPath(); ctx.arc(sx - 5, sy - 20, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#86efac'; ctx.beginPath(); ctx.arc(sx + 2, sy - 26, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#14532d'; ctx.fillRect(sx - 4, sy - 8 + stride * 0.4, 3, 8); ctx.fillRect(sx + 1, sy - 8 - stride * 0.4, 3, 8);
     } else {
-      // Skeletal Warrior
-      ctx.fillStyle = flash ? '#ffffff' : '#cbd5e1';
+      // Crypt Skeleton / Shadow Rival
+      ctx.fillStyle = flash ? '#ffffff' : (m.type === 'rival' ? '#4c1d95' : '#cbd5e1');
       ctx.fillRect(sx - 5, sy - 25, 10, 14);
       ctx.fillStyle = '#0f172a';
       ctx.fillRect(sx - 3, sy - 22, 6, 2);
       ctx.fillRect(sx - 3, sy - 18, 6, 2);
-      // Skull
-      ctx.fillStyle = flash ? '#ffffff' : '#e2e8f0';
-      ctx.beginPath();
-      ctx.arc(sx, sy - 31, 6, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.fillStyle = flash ? '#ffffff' : (m.type === 'rival' ? '#c084fc' : '#e2e8f0');
+      ctx.beginPath(); ctx.arc(sx, sy - 31, 6, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#ef4444';
       ctx.fillRect(sx - 3, sy - 32, 2, 2);
       ctx.fillRect(sx + 1, sy - 32, 2, 2);
-      // Rusty Blade
       ctx.fillStyle = '#94a3b8';
       ctx.fillRect(sx + 6, sy - 26, 2.5, 14);
-      // Legs
       ctx.fillStyle = '#cbd5e1';
       ctx.fillRect(sx - 4.5, sy - 11 + stride * 0.4, 3, 11);
       ctx.fillRect(sx + 1.5, sy - 11 - stride * 0.4, 3, 11);
     }
 
-    // Overhead affix tag on Champion Ghouls & compact HP bar
-    if (!isBoss && isGhoul && m.affixes?.length) {
+    // Overhead affix tag on Elites & compact HP bar
+    if (!isBoss && m.tier === 'elite' && m.affixes?.length) {
       const aff = ELITE_AFFIXES[m.affixes[0]];
       if (aff) {
         ctx.font = '700 9px sans-serif';
@@ -4486,6 +4964,13 @@
       ctx.beginPath();
       ctx.arc(sx, sy - 4, 5 + Math.sin(now * 0.006) * 1, 0, Math.PI * 2);
       ctx.fill();
+    } else if (drop.kind === 'xp_gem') {
+      ctx.fillStyle = '#4ade80';
+      ctx.beginPath();
+      ctx.moveTo(sx, sy - 9); ctx.lineTo(sx + 4, sy - 4); ctx.lineTo(sx, sy + 1); ctx.lineTo(sx - 4, sy - 4); ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#dcfce7';
+      ctx.fillRect(sx - 1, sy - 6, 2, 2);
     } else if (drop.kind === 'gold') {
       ctx.fillStyle = '#facc15';
       ctx.beginPath();
@@ -4510,7 +4995,7 @@
     ctx.textBaseline = 'middle';
 
     for (const d of state.lootDrops) {
-      if (d.z > 4 || !passesLootFilter(d)) {
+      if (d.z > 4 || d.kind === 'xp_gem' || !passesLootFilter(d)) {
         d.screenRect = null;
         continue;
       }
@@ -4669,6 +5154,21 @@
     if (force || c.buffStr !== buffStr) { dom.buffBadge.textContent = buffStr; dom.buffBadge.classList.toggle('hidden', !buffStr); c.buffStr = buffStr; }
     if (force || c.condStr !== condStr) { dom.conditionBadge.textContent = condStr; dom.conditionBadge.classList.toggle('hidden', !condStr); c.condStr = condStr; }
 
+    const streakStr = (state.mode === 'DUNGEON' && state.killStreak >= 5)
+      ? `🔥 ${state.killStreak} STREAK (${getStreakMultiplier()}x XP)`
+      : '';
+    if (dom.streakBadge && (force || c.streakStr !== streakStr)) {
+      dom.streakBadge.textContent = streakStr;
+      dom.streakBadge.classList.toggle('hidden', !streakStr);
+      c.streakStr = streakStr;
+    }
+    const autoTxt = state.autoCombat ? 'Auto: ON' : 'Auto: OFF';
+    if (dom.autoCombatLabel && (force || c.autoTxt !== autoTxt)) {
+      dom.autoCombatLabel.textContent = autoTxt;
+      dom.btnAutoCombat?.classList.toggle('active', state.autoCombat);
+      c.autoTxt = autoTxt;
+    }
+
     if (force || c.bagLen !== p.bag.length) { dom.lootCountBadge.textContent = p.bag.length; c.bagLen = p.bag.length; }
     if (force || c.potions !== p.potions) { dom.potionCount.textContent = p.potions; c.potions = p.potions; }
     if (force || c.elixirs !== p.manaElixirs) { dom.manaElixirCount.textContent = p.manaElixirs; c.elixirs = p.manaElixirs; }
@@ -4804,54 +5304,53 @@
     dom.classSelectGrid.innerHTML = '';
     for (const id of Object.keys(HERO_CLASSES)) {
       const cls = HERO_CLASSES[id];
-      const card = document.createElement('button');
-      card.type = 'button';
-      card.className = 'class-card' + (state.selectedCreateClass === id ? ' selected' : '');
-      card.innerHTML = `
-        <div class="class-card-top">
-          <canvas class="class-portrait" width="96" height="96"></canvas>
-          <div>
-            <div class="class-card-name">${cls.name}</div>
-            <div class="class-card-role">${cls.role}</div>
-          </div>
-        </div>
-        <div class="class-stat-chips">
-          <div class="stat-chip">STR<strong>${cls.stats.str}</strong></div>
-          <div class="stat-chip">DEX<strong>${cls.stats.dex}</strong></div>
-          <div class="stat-chip">INT<strong>${cls.stats.int}</strong></div>
-          <div class="stat-chip">VIT<strong>${cls.stats.vit}</strong></div>
-        </div>
-        <div class="class-skills-list">
-          <span>Kit:</span> ${cls.basicName} • ${cls.skills[1].name} • ${cls.skills[2].name} • ${cls.skills[3].name}<br>
-          <span>Ult:</span> ${cls.ultName}
-        </div>
-      `;
-      card.addEventListener('click', () => { sfx.unlock(); state.selectedCreateClass = id; renderClassPortraits(); });
-      dom.classSelectGrid.appendChild(card);
-
-      const pCan = card.querySelector('canvas');
-      const pCtx = pCan.getContext('2d');
-      pCtx.fillStyle = '#07090e'; pCtx.fillRect(0, 0, 96, 96);
-      const grad = pCtx.createRadialGradient(48, 48, 4, 48, 48, 46);
-      grad.addColorStop(0, 'rgba(217, 119, 6, 0.25)'); grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-      pCtx.fillStyle = grad; pCtx.fillRect(0, 0, 96, 96);
-      pCtx.save(); pCtx.translate(48, 72); pCtx.scale(1.35, 1.35);
-      pCtx.fillStyle = cls.cloak; pCtx.fillRect(-8, -26, 16, 20);
-      pCtx.fillStyle = cls.armorColor; pCtx.fillRect(-7, -28, 14, 15);
-      pCtx.fillStyle = cls.trimColor; pCtx.fillRect(-1.5, -26, 3, 11);
-      pCtx.fillStyle = id === 'paladin' ? '#cbd5e1' : cls.cloak; pCtx.fillRect(-6, -39, 12, 11);
-      pCtx.fillStyle = cls.trimColor; pCtx.fillRect(-3, -34, 6, 2);
-      pCtx.restore();
+      const pill = document.createElement('button');
+      pill.type = 'button';
+      pill.className = 'class-pill-btn' + (state.selectedCreateClass === id ? ' selected' : '');
+      pill.textContent = cls.name;
+      pill.addEventListener('click', () => { sfx.unlock(); state.selectedCreateClass = id; renderClassPortraits(); });
+      dom.classSelectGrid.appendChild(pill);
     }
 
-    // Pet selector
+    const selCls = HERO_CLASSES[state.selectedCreateClass] || HERO_CLASSES.paladin;
+    if (dom.classPreviewCanvas) {
+      const pCtx = dom.classPreviewCanvas.getContext('2d');
+      pCtx.fillStyle = '#07090e'; pCtx.fillRect(0, 0, 88, 88);
+      const grad = pCtx.createRadialGradient(44, 44, 4, 44, 44, 42);
+      grad.addColorStop(0, 'rgba(217, 119, 6, 0.25)'); grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      pCtx.fillStyle = grad; pCtx.fillRect(0, 0, 88, 88);
+      pCtx.save(); pCtx.translate(44, 66); pCtx.scale(1.25, 1.25);
+      pCtx.fillStyle = selCls.cloak; pCtx.fillRect(-8, -26, 16, 20);
+      pCtx.fillStyle = selCls.armorColor; pCtx.fillRect(-7, -28, 14, 15);
+      pCtx.fillStyle = selCls.trimColor; pCtx.fillRect(-1.5, -26, 3, 11);
+      pCtx.fillStyle = selCls.id === 'paladin' ? '#cbd5e1' : selCls.cloak; pCtx.fillRect(-6, -39, 12, 11);
+      pCtx.fillStyle = selCls.trimColor; pCtx.fillRect(-3, -34, 6, 2);
+      pCtx.restore();
+    }
+    if (dom.classPreviewInfo) {
+      dom.classPreviewInfo.innerHTML = `
+        <div class="class-card-name">${selCls.name}</div>
+        <div class="class-card-role">${selCls.role}</div>
+        <div class="class-stat-chips">
+          <div class="stat-chip">STR<strong>${selCls.stats.str}</strong></div>
+          <div class="stat-chip">DEX<strong>${selCls.stats.dex}</strong></div>
+          <div class="stat-chip">INT<strong>${selCls.stats.int}</strong></div>
+          <div class="stat-chip">VIT<strong>${selCls.stats.vit}</strong></div>
+        </div>
+        <div class="class-skills-list">
+          <span>Kit:</span> ${selCls.skills[1].name} • ${selCls.skills[2].name} • ${selCls.skills[3].name} • <span>Ult:</span> ${selCls.ultName}
+        </div>
+      `;
+    }
+
+    // Pet selector pills
     dom.petSelectGrid.innerHTML = '';
     for (const pId of Object.keys(PETS_CONFIG)) {
       const pet = PETS_CONFIG[pId];
       const pc = document.createElement('button');
       pc.type = 'button';
-      pc.className = 'class-card' + (state.selectedCreatePet === pId ? ' selected' : '');
-      pc.innerHTML = `<div class="class-card-name" style="color:${pet.color}">${pet.name}</div><div class="class-card-role">${pet.skillName} • ${pet.passiveDesc}</div>`;
+      pc.className = 'pet-pill-btn' + (state.selectedCreatePet === pId ? ' selected' : '');
+      pc.innerHTML = `<strong style="color:${pet.color}">${pet.name}</strong><br><small>${pet.passiveDesc}</small>`;
       pc.addEventListener('click', () => { sfx.unlock(); state.selectedCreatePet = pId; renderClassPortraits(); });
       dom.petSelectGrid.appendChild(pc);
     }
@@ -4943,10 +5442,10 @@
 
     if (npcId === 'blacksmith') {
       dom.townNpcTitle.textContent = 'Blacksmith Forge';
-      dom.townNpcSubtitle.textContent = `Dust: ${p.dust} • Durability: ${p.durability}%`;
+      dom.townNpcSubtitle.textContent = `Arcane Dust: ${p.dust} • Instant Gear Upgrade & Salvage`;
       const tabs = document.createElement('div');
       tabs.className = 'npc-tabs';
-      for (const [tid, lbl] of [['buy', 'Buy'], ['temper', 'Temper'], ['reforge', 'Reforge'], ['repair', 'Repair'], ['salvage', 'Salvage']]) {
+      for (const [tid, lbl] of [['buy', 'Buy'], ['temper', 'Temper'], ['reforge', 'Reforge'], ['salvage', 'Salvage']]) {
         const b = document.createElement('button');
         b.type = 'button';
         b.className = 'npc-tab-btn' + (subTab === tid ? ' active' : '');
@@ -5000,23 +5499,6 @@
           });
           list.appendChild(row);
         }
-      } else if (subTab === 'repair') {
-        const repRow = document.createElement('div');
-        repRow.className = 'npc-row';
-        const repCost = Math.max(0, Math.round((100 - p.durability) * 1.5));
-        repRow.innerHTML = `<div class="npc-row-info"><div class="npc-row-title">Repair All Equipped Gear</div><div class="npc-row-sub">Current Durability: ${p.durability}%</div></div><button type="button" class="npc-action-btn" ${p.durability >= 100 || p.gold < repCost ? 'disabled' : ''}>${repCost === 0 ? 'Full' : repCost + 'g'}</button>`;
-        repRow.querySelector('button').addEventListener('click', () => {
-          p.gold -= repCost; p.durability = 100; syncPlayerVitalsBounds(); sfx.anvil(); saveHeroProfile(); openTownNpcDrawer('blacksmith', 'repair');
-        });
-        list.appendChild(repRow);
-        const kitRow = document.createElement('div');
-        kitRow.className = 'npc-row';
-        kitRow.innerHTML = `<div class="npc-row-info"><div class="npc-row-title">Field Repair Kit (+1)</div><div class="npc-row-sub">Carried: ${p.repairKits} • Restores 100% Durability anywhere</div></div><button type="button" class="npc-action-btn" ${p.gold < 45 ? 'disabled' : ''}>45g</button>`;
-        kitRow.querySelector('button').addEventListener('click', () => {
-          if (p.gold < 45) return;
-          p.gold -= 45; p.repairKits += 1; sfx.loot(); saveHeroProfile(); openTownNpcDrawer('blacksmith', 'repair');
-        });
-        list.appendChild(kitRow);
       } else {
         // SALVAGE TAB WITH PROMINENT "SALVAGE ALL" BUTTON
         const gearItems = p.bag.filter((it) => it && it.kind !== 'gem');
@@ -5303,6 +5785,80 @@
     if (!dom.townNpcDrawer.open) dom.townNpcDrawer.showModal();
   }
 
+  function openSkillTreeModal(forceOpen) {
+    if (!dom.skillTreeModal) return;
+    const shouldOpen = typeof forceOpen === 'boolean' ? forceOpen : !dom.skillTreeModal.open;
+    if (!shouldOpen) {
+      if (dom.skillTreeModal.open) dom.skillTreeModal.close();
+      return;
+    }
+    const p = state.player;
+    const cfg = getActiveSkillConfig();
+    if (dom.stSpCount) dom.stSpCount.textContent = p.skillPoints || 0;
+    if (dom.stMpCount) dom.stMpCount.textContent = p.masteryPoints || 0;
+
+    if (dom.skillTreeBody) {
+      const skillsHtml = [1, 2, 3].map((id) => {
+        const rk = p.skillRanks[id] || 1;
+        const aw = state.awakenedSkills[id] ? ' ★ AWAKENED' : '';
+        return `<div class="npc-row"><div class="npc-row-info"><div class="npc-row-title">${cfg[id].name} (Lv ${rk}/5${aw})</div><div class="npc-row-sub">Mana ${cfg[id].mana} • CD ${cfg[id].cd}s • +18% Dmg/Lv</div></div><button type="button" class="npc-action-btn" data-st-skill="${id}" ${rk >= 5 || p.skillPoints < 1 ? 'disabled' : ''}>+1 Lv (1 SP)</button></div>`;
+      }).join('');
+
+      const weaponsHtml = `
+        <div class="npc-row"><div class="npc-row-info"><div class="npc-row-title">Bone Blades (Lv ${state.autoWeapons.boneBlades}/3)</div><div class="npc-row-sub">Orbiting blades auto-slice foes</div></div></div>
+        <div class="npc-row"><div class="npc-row-info"><div class="npc-row-title">Chain Lightning (Lv ${state.autoWeapons.chainLightning}/3)</div><div class="npc-row-sub">Storm arcs zap multiple foes</div></div></div>
+        <div class="npc-row"><div class="npc-row-info"><div class="npc-row-title">Ember Aura (Lv ${state.autoWeapons.emberAura}/3)</div><div class="npc-row-sub">Scorching fire aura burns nearby</div></div></div>
+      `;
+
+      const masteryHtml = MASTERY_NODES.map((n) => {
+        const unl = p.masteryUnlocked.includes(n.id);
+        const can = !unl && p.masteryPoints > 0 && (!n.req || p.masteryUnlocked.includes(n.req));
+        return `<button type="button" class="mastery-node-btn ${unl ? 'unlocked' : ''}" data-st-mastery="${n.id}" ${!can && !unl ? 'disabled' : ''}><strong>${n.name}</strong><br>${n.desc}</button>`;
+      }).join('');
+
+      dom.skillTreeBody.innerHTML = `
+        <div class="skill-tree-cols">
+          <div class="skill-col-card"><div class="section-heading">Active Skills & Auto-Weapons</div><div class="npc-list">${skillsHtml}${weaponsHtml}</div></div>
+          <div class="skill-col-card"><div class="section-heading">Constellation Mastery</div><div class="mastery-node-grid">${masteryHtml}</div></div>
+        </div>
+      `;
+
+      dom.skillTreeBody.querySelectorAll('[data-st-skill]').forEach((b) => {
+        b.addEventListener('click', () => {
+          const sid = Number(b.dataset.stSkill);
+          if (p.skillPoints < 1 || (p.skillRanks[sid] || 1) >= 5) return;
+          p.skillPoints -= 1; p.skillRanks[sid] = (p.skillRanks[sid] || 1) + 1;
+          sfx.lvl(); saveHeroProfile(); openSkillTreeModal(true); syncHudDom(true);
+        });
+      });
+      dom.skillTreeBody.querySelectorAll('[data-st-mastery]').forEach((b) => {
+        b.addEventListener('click', () => {
+          const id = b.dataset.stMastery;
+          const node = MASTERY_NODES.find((n) => n.id === id);
+          if (!node || p.masteryUnlocked.includes(id) || p.masteryPoints < 1) return;
+          if (node.req && !p.masteryUnlocked.includes(node.req)) return;
+          p.masteryPoints -= 1; p.masteryUnlocked.push(id);
+          syncPlayerVitalsBounds(); sfx.holy(); saveHeroProfile(); openSkillTreeModal(true); syncHudDom(true);
+        });
+      });
+    }
+    if (!dom.skillTreeModal.open) dom.skillTreeModal.showModal();
+  }
+
+  function salvageAllBagGear() {
+    const p = state.player;
+    const gearItems = p.bag.filter((it) => it && it.kind !== 'gem');
+    if (!gearItems.length) { showToast('Backpack has no gear to salvage.'); return; }
+    const totalG = gearItems.reduce((acc, it) => acc + salvageGoldValue(it), 0);
+    const totalD = gearItems.length * 2;
+    p.gold += totalG;
+    p.dust += totalD;
+    p.bag = p.bag.filter((it) => it && it.kind === 'gem');
+    state.selectedInspect = null;
+    sfx.anvil(); saveHeroProfile(); syncHudDom(true); renderInventoryUI();
+    showToast(`Salvaged ${gearItems.length} items (+${totalG}g, +${totalD} Dust)!`);
+  }
+
   function toggleInventory(forceOpen) {
     const shouldOpen = typeof forceOpen === 'boolean' ? forceOpen : !dom.inventoryDrawer.open;
     if (shouldOpen) {
@@ -5440,9 +5996,11 @@
     dom.mpBadge.textContent = p.masteryPoints || 0;
 
     dom.invTabGear.classList.toggle('active', state.invTab === 'gear');
+    dom.invTabStats?.classList.toggle('active', state.invTab === 'stats');
     dom.invTabSkills.classList.toggle('active', state.invTab === 'skills');
     dom.invTabMastery.classList.toggle('active', state.invTab === 'mastery');
     dom.invGearPanel.classList.toggle('hidden', state.invTab !== 'gear');
+    dom.invStatsPanel?.classList.toggle('hidden', state.invTab !== 'stats');
     dom.invSkillsPanel.classList.toggle('hidden', state.invTab !== 'skills');
     dom.invMasteryPanel.classList.toggle('hidden', state.invTab !== 'mastery');
 
@@ -5453,6 +6011,18 @@
       `<div class="stat-chip"><span>LOH</span>${totals.loh}</div>`,
       `<div class="stat-chip"><span>ARM</span>${Math.round(totals.arm)}</div>`
     ].join('');
+
+    if (state.invTab === 'stats' && dom.invStatsPanel) {
+      const sets = getSetCounts();
+      const setLines = Object.entries(sets).filter(([, c]) => c >= 2).map(([id, c]) => `${SET_DEFS[id].name} (${c}pc)`).join(' • ') || 'None active';
+      dom.invStatsPanel.innerHTML = `<div class="npc-list">
+        <div class="npc-row"><div class="npc-row-info"><div class="npc-row-title">Combat Rating & Speed</div><div class="npc-row-sub">ATK ${totals.atk} • Crit ${totals.crit}% (${Math.round(totals.critDmg * 100)}%) • AtkSpd ${Math.round(totals.atkSpeedMult * 100)}% • Move ${totals.speed.toFixed(1)}</div></div></div>
+        <div class="npc-row"><div class="npc-row-info"><div class="npc-row-title">Defense & Sustain</div><div class="npc-row-sub">HP ${p.maxHp} • MP ${p.maxMp} • Armor ${Math.round(totals.arm)} • Life on Hit +${totals.loh}</div></div></div>
+        <div class="npc-row"><div class="npc-row-info"><div class="npc-row-title">Auto-Weapons & Run Passives</div><div class="npc-row-sub">Blades Lv${state.autoWeapons.boneBlades} • Chain Lv${state.autoWeapons.chainLightning} • Ember Lv${state.autoWeapons.emberAura} • Magnet ${Math.round(totals.magnetMult * 100)}%</div></div></div>
+        <div class="npc-row"><div class="npc-row-info"><div class="npc-row-title">Active Set Bonuses</div><div class="npc-row-sub">${setLines}</div></div></div>
+      </div>`;
+      return;
+    }
 
     if (state.invTab === 'skills') {
       const cfg = getActiveSkillConfig();
@@ -5523,10 +6093,7 @@
     dom.swapSetStrip.innerHTML = `<span>Swap Set: <strong>${p.swapSet?.weapon ? p.swapSet.weapon.name : 'None'}</strong></span><button id="btnInvSwapNow" type="button" class="compact-toggle-btn">⇄ Swap</button>`;
     dom.swapSetStrip.querySelector('#btnInvSwapNow').addEventListener('click', () => { swapWeaponLoadout(); renderInventoryUI(); });
 
-    dom.invSalvageDropZone.dataset.dropType = 'salvage';
-    dom.invSalvageDropZone.dataset.dropKey = '1';
-
-    // Backpack Grid
+    // Backpack Grid (12 streamlined slots)
     dom.backpackGrid.innerHTML = '';
     for (let i = 0; i < MAX_BAG_SLOTS; i++) {
       const item = p.bag[i];
@@ -5538,8 +6105,7 @@
       if (item) {
         cell.dataset.rarity = item.rarity;
         if (state.selectedInspect?.source === 'bag' && state.selectedInspect.key === i) cell.classList.add('selected');
-        const pips = item.sockets ? `<div class="socket-pips">${Array.from({ length: item.sockets }, (_, si) => `<span class="socket-pip ${item.gems?.[si] ? 'filled-' + item.gems[si] : ''}"></span>`).join('')}</div>` : '';
-        cell.innerHTML = `<canvas class="item-icon-canvas" width="30" height="30"></canvas><span class="slot-name rarity-${item.rarity}">${item.name}</span>${pips}`;
+        cell.innerHTML = `<canvas class="item-icon-canvas" width="30" height="30"></canvas><span class="slot-name rarity-${item.rarity}">${item.name}</span>`;
         drawItemIcon(cell.querySelector('canvas'), item);
         cell.addEventListener('click', () => { state.selectedInspect = { source: 'bag', key: i }; renderInventoryUI(); });
         attachInvDrag(cell, 'bag', i, item);
@@ -5644,6 +6210,7 @@
   // CANVAS RESIZE, MAIN LOOP & PWA REGISTRATION
   // =========================================================================
   function resizeCanvas() {
+    document.documentElement.style.setProperty('--app-height', `${window.innerHeight}px`);
     const isMobile = window.matchMedia('(pointer: coarse)').matches || window.innerWidth <= 900;
     const dpr = Math.min(window.devicePixelRatio || 1, isMobile ? 1.25 : 1.5);
     const w = canvas.clientWidth;
@@ -5663,11 +6230,13 @@
     lastFrame = now;
 
     if (state.screen === 'TOWN' || state.screen === 'DUNGEON') {
-      updatePlayer(dt);
-      updatePets(dt);
-      updateMinions(dt);
-      updateMonsters(dt);
-      updateEffectsAndLoot(dt);
+      if (!state.draftOpen && !dom.skillTreeModal?.open) {
+        updatePlayer(dt);
+        updatePets(dt);
+        updateMinions(dt);
+        updateMonsters(dt);
+        updateEffectsAndLoot(dt);
+      }
       renderIsometricWorld(now);
 
       if (window.CryptCoop && window.CryptCoop.active) {

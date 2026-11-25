@@ -1,5 +1,5 @@
 // Crypt of Shadows ARPG - Offline PWA Service Worker (Network-First with Cache Fallback)
-const CACHE_NAME = 'zdc-crypt-v0.3.1';
+const CACHE_NAME = 'zdc-crypt-v0.4.0';
 const STATIC_ASSETS = [
   './',
   './index.html',

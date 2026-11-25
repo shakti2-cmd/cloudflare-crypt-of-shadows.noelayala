@@ -64,7 +64,8 @@ html, body {
 
 #inventoryDrawer:not([open]),
 #townNpcDrawer:not([open]),
-#saveTransferDrawer:not([open]) {
+#saveTransferDrawer:not([open]),
+#skillTreeModal:not([open]) {
   display: none;
   pointer-events: none;
 }
@@ -727,7 +728,7 @@ html, body {
 
 .inv-sheet {
   width: min(560px, 100%);
-  max-height: 88dvh;
+  max-height: calc(var(--app-height, 100dvh) - 16px);
   background: linear-gradient(180deg, #131822 0%, #090b10 100%);
   border: 2px solid var(--iron-border);
   border-bottom: none;
@@ -737,6 +738,28 @@ html, body {
   flex-direction: column;
   overflow: hidden;
   padding-bottom: var(--safe-bottom);
+}
+
+#skillTreeModal {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  width: 100%;
+  max-width: 100%;
+  height: 100dvh;
+  max-height: 100dvh;
+  color: var(--text-main);
+}
+
+#skillTreeModal[open] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#skillTreeModal::backdrop {
+  background: rgba(3, 4, 7, 0.84);
 }
 
 .inv-header {
@@ -800,12 +823,23 @@ html, body {
 
 .inv-body {
   flex: 1;
-  overflow-y: auto;
-  padding: 12px 16px 18px;
+  overflow: hidden;
+  padding: 10px 14px 12px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  touch-action: pan-y;
+  gap: 8px;
+}
+
+.zero-scroll-panel {
+  max-height: calc(var(--app-height, 100dvh) - 16px) !important;
+  overflow: hidden !important;
+  display: flex;
+  flex-direction: column;
+}
+
+.zero-scroll-body {
+  overflow: hidden !important;
+  justify-content: space-between;
 }
 
 .section-heading {
@@ -1056,8 +1090,187 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: calc(16px + var(--safe-top)) 16px calc(16px + var(--safe-bottom));
-  overflow-y: auto;
+  padding: 8px 10px;
+  overflow: hidden;
+}
+
+.menu-card {
+  width: min(460px, 100%);
+  padding: 14px 16px;
+  text-align: center;
+  gap: 10px;
+}
+
+.menu-head-compact {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: left;
+}
+
+.menu-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.create-card {
+  width: min(760px, 100%);
+  padding: 12px 14px;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.class-pills-row,
+.pet-pills-row {
+  display: grid;
+  gap: 6px;
+}
+
+.class-pills-row {
+  grid-template-columns: repeat(5, 1fr);
+}
+
+.pet-pills-row {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.class-pill-btn {
+  min-height: 44px;
+  padding: 6px 4px;
+  border-radius: 8px;
+  border: 1.5px solid #2b3344;
+  background: #0d111a;
+  color: #e2e8f0;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  text-align: center;
+}
+
+.class-pill-btn.selected {
+  border-color: var(--gold-trim);
+  background: linear-gradient(180deg, rgba(50, 32, 16, 0.65), #0d111a);
+  color: #fef08a;
+}
+
+.class-preview-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid #2c3547;
+  background: #0b0f17;
+  text-align: left;
+}
+
+.class-preview-info {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: #e2e8f0;
+  line-height: 1.35;
+}
+
+/* 3-Card Level-Up Draft Modal */
+.draft-card-shell {
+  width: min(820px, 100%);
+  padding: 14px;
+  gap: 10px;
+  text-align: center;
+}
+
+.draft-header h2 {
+  margin: 4px 0 2px;
+}
+
+.draft-sub {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.draft-cards-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+@media (min-width: 720px) {
+  .draft-cards-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+}
+
+.draft-option-card {
+  min-height: 92px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 2px solid #334155;
+  background: linear-gradient(180deg, #161d2b 0%, #0b0f17 100%);
+  color: #e2e8f0;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+}
+
+.draft-option-card:hover,
+.draft-option-card:active {
+  border-color: var(--gold-trim);
+  box-shadow: 0 0 18px rgba(250, 204, 21, 0.25);
+}
+
+.draft-option-card.awakened {
+  border-color: #fb923c;
+  background: linear-gradient(180deg, #3b170b 0%, #140b09 100%);
+}
+
+.draft-tag {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #93c5fd;
+}
+
+.draft-name {
+  font-size: 15px;
+  font-weight: 900;
+  color: #fef08a;
+}
+
+.draft-desc {
+  font-size: 12px;
+  color: #cbd5e1;
+}
+
+/* Kill Streak Combo Badge */
+.streak-badge {
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1.5px solid #f97316;
+  background: rgba(67, 20, 7, 0.92);
+  color: #fde047;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.75);
+}
+
+.salvage-mini-btn {
+  border-color: #b45309;
+  color: #fde68a;
+  background: #3a1a0d;
+}
+
+button:disabled {
+  opacity: 0.4 !important;
 }
 
 .menu-backdrop-glow {
@@ -1532,8 +1745,20 @@ html, body {
 
 .paperdoll-grid {
   display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.backpack-grid {
+  display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 6px;
+}
+
+@media (min-width: 760px) {
+  .backpack-grid {
+    grid-template-columns: repeat(6, 1fr);
+  }
 }
 
 .swap-set-strip {
@@ -1553,7 +1778,8 @@ html, body {
 .gear-slot,
 .bag-cell {
   position: relative;
-  min-height: 68px;
+  min-height: 54px;
+  padding: 4px;
   touch-action: none;
   user-select: none;
 }
@@ -1813,9 +2039,15 @@ html, body {
 }
 
 .npc-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+
+@media (min-width: 640px) {
+  .npc-list {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 .npc-row {
